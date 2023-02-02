@@ -1,14 +1,29 @@
 Package: calculeflux
+Title: Calculeflux
 Version: 0.0.0.9000
-Title: Package To Calculate Nitrogen And Phosphorus Fluxes In Streams
-Description: Calculation of fluxes with differents methods described in https://revue-set.fr/article/view/6291.
-Authors@R: c(person(given = "Anthony",
-         family = "DE BURGHRAVE",
-         role = c("aut", "cre"),
-         email = "anthony.deburghrave@eaux-et-vilaine.bzh"),
-  person(given = "ETPB Eaux & Vilaine",
-         role = "cph"))
+Authors@R: c(
+    person("Anthony", "DE BURGHRAVE", , "anthony.deburghrave@eaux-et-vilaine.bzh", role = c("aut", "cre")),
+    person("ETPB Eaux & Vilaine", role = "cph")
+  )
+Description: Package to calculate nitrogen and phosphorus fluxes in
+    streams. Calculation of fluxes with differents methods described in
+    https://revue-set.fr/article/view/6291.
 License: MIT + file LICENSE
+Imports: 
+    dplyr,
+    httr,
+    jsonlite,
+    magrittr,
+    rlang,
+    utils,
+    zoo
+Suggests: 
+    ggplot2,
+    knitr,
+    rmarkdown,
+    testthat
+VignetteBuilder: 
+    knitr
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.2.1
+RoxygenNote: 7.2.3
