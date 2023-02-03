@@ -411,7 +411,7 @@ ggplot2::ggplot(rslt_semnon, ggplot2::aes(annee_hydro, flux)) +
 
 ##############################
 
-#CALCUL DU FLUX DE NITRATE SUR LA VILAINE A VEC SIMFEN
+#CALCUL DU FLUX DE NITRATE SUR LA VILAINE AVEC SIMFEN
 datafile <- system.file("nitrates.csv", package = "calculeflux")
 nitrates <- read.csv2(datafile, encoding = "UTF-8")
 
@@ -421,7 +421,7 @@ nitrates$DatePrel<-nitrates$DatePrel%>%as.Date()
 summary(nitrates$DatePrel)
 
 
-# import des débits sur le Semnon à Eancé
+# import des débits sur la Vilaine au niveau de la station hydro
 debit_vilaine<-importe_debit(X=314920, 
                           Y=6732475, 
                           date_debut=as.Date("2010-10-01"), 
@@ -462,14 +462,30 @@ ggplot2::ggplot(flux_vilaine_simfen, ggplot2::aes(annee_hydro, flux)) +
           estim\u00e9s \u00e0 l\'aide de l\'API SIMFEN / GEOSAS")
 
 
+```
+
+  
+
  
 
+# importe_BV_amont
 
+    
+
+  
+
+```{r example-importe_BV_amont}
+shp<-importe_BV_amont(X=381425.6,
+                      Y=6755598)
+
+plot(sf::st_geometry(shp))
 
 ```
 
   
 
+   
+ 
   
 
 

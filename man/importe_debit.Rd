@@ -25,9 +25,11 @@ dataframe avec 1 colonne date et 1 colonne qjm, qjm étant le débit journalier 
 \description{
 Fonction pour importer des données de débit à partir des API SIMFEN
 https://geosas.fr/web/?page_id=3804
+La fonction exploite en priorité la base des archives DREAL et en complément celles hubeau
 
 Fonction pour importer des données de débit à partir des API SIMFEN
 https://geosas.fr/web/?page_id=3804
+La fonction exploite en priorité la base des archives DREAL et en complément celles hubeau
 }
 \examples{
 test_debit<-importe_debit(X=381425.6, 
@@ -90,7 +92,7 @@ ggplot2::ggplot(rslt_semnon, ggplot2::aes(annee_hydro, flux)) +
 
 ##############################
 
-#CALCUL DU FLUX DE NITRATE SUR LA VILAINE A VEC SIMFEN
+#CALCUL DU FLUX DE NITRATE SUR LA VILAINE AVEC SIMFEN
 datafile <- system.file("nitrates.csv", package = "calculeflux")
 nitrates <- read.csv2(datafile, encoding = "UTF-8")
 
@@ -100,7 +102,7 @@ nitrates$DatePrel<-nitrates$DatePrel\%>\%as.Date()
 summary(nitrates$DatePrel)
 
 
-# import des débits sur le Semnon à Eancé
+# import des débits sur la Vilaine au niveau de la station hydro
 debit_vilaine<-importe_debit(X=314920, 
                           Y=6732475, 
                           date_debut=as.Date("2010-10-01"), 
@@ -139,10 +141,6 @@ ggplot2::ggplot(flux_vilaine_simfen, ggplot2::aes(annee_hydro, flux)) +
   ggplot2::ggtitle("Flux de nitrates calcul\u00e9s sur la Vilaine \u00e0 Rieux",
           subtitle="NO3 station 04216000 / d\u00e9bits 
           estim\u00e9s \u00e0 l\'aide de l\'API SIMFEN / GEOSAS")
-
-
- 
-
 
 
 }

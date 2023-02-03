@@ -17,6 +17,7 @@ Imports:
     jsonlite,
     magrittr,
     rlang,
+    sf,
     utils,
     xml2,
     zoo

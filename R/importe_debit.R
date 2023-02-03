@@ -4,6 +4,7 @@
 #' 
 #' Fonction pour importer des données de débit à partir des API SIMFEN
 #' https://geosas.fr/web/?page_id=3804
+#' La fonction exploite en priorité la base des archives DREAL et en complément celles hubeau
 #' 
 #' @param X : coordonnée du point à partir duquel on souhaite estimer les débits en Lambert 93
 #' @param Y :  coordonnée du point à partir duquel on souhaite estimer les débits en Lambert 93
@@ -18,74 +19,132 @@
 #'                           Y=6755598, 
 #'                           date_debut=as.Date("2010-01-01"), 
 #'                           date_fin = as.Date("2010-01-17"))
-importe_debit <- function(X, Y, date_debut, date_fin){
-  if(!("numeric"%in%class(X))){stop("X doit \u00eatre de type numeric")}  
-  if(!("numeric"%in%class(Y))){stop("Y doit \u00eatre de type numeric")} 
-  if(!("Date"%in%class(date_debut))){stop("date_debut doit \u00eatre de type Date")} 
-  if(!("Date"%in%class(date_fin))){stop("date_fin doit \u00eatre de type Date")}
-  if(date_fin<date_debut){stop("date_fin doit \u00eatre sup\u00e9rieure ou \u00e9gale \u00e0 date_debut")}
+importe_debit <- function(X, Y, date_debut, date_fin) {
+  if (!("numeric" %in% class(X))) {
+    stop("X doit \u00eatre de type numeric")
+  }
+  if (!("numeric" %in% class(Y))) {
+    stop("Y doit \u00eatre de type numeric")
+  }
+  if (!("Date" %in% class(date_debut))) {
+    stop("date_debut doit \u00eatre de type Date")
+  }
+  if (!("Date" %in% class(date_fin))) {
+    stop("date_fin doit \u00eatre de type Date")
+  }
+  if (date_fin < date_debut) {
+    stop("date_fin doit \u00eatre sup\u00e9rieure ou \u00e9gale \u00e0 date_debut")
+  }
   
   
   # teste si les dates demandées sont disponibles sous geosas
   dates_dispo <- importe_debit_dates_dispo()
+  
+  #on se limite aux modèles hub_eau et archive_dreal
+   dates_dispo<-dates_dispo[dates_dispo$name%in%c(" hub_eau"," archives_dreal"),]
+  
+  #temporaire car hub_eau est HS sous SIMFEN
+  dates_dispo<-dates_dispo[dates_dispo$name!=(" hub_eau"),]
+  
+  
   if (date_debut < min(dates_dispo$start_date)) {
-    stop(paste0(
-      "L\'API SIMPFEN n\'est pas disponible pour les dates ant\u00e9rieures \u00e0 ",
-      format(min(dates_dispo$start_date), "%d/%m/%Y")
-    ))
+    stop(
+      paste0(
+        "L\'API SIMPFEN n\'est pas disponible pour les dates ant\u00e9rieures \u00e0 ",
+        format(min(dates_dispo$start_date), "%d/%m/%Y")
+      )
+    )
   }
-    if (date_fin > max(dates_dispo$end_date)) {
-    stop(paste0(
-      "L\'API SIMPFEN n\'est pas disponible pour les dates post\u00e9rieures \u00e0 ",
-      format(max(dates_dispo$end_date), "%d/%m/%Y")
-    ))
+  if (date_fin > max(dates_dispo$end_date)) {
+    stop(
+      paste0(
+        "L\'API SIMPFEN n\'est pas disponible pour les dates post\u00e9rieures \u00e0 ",
+        format(max(dates_dispo$end_date), "%d/%m/%Y")
+      )
+    )
   }
   
-
+  # sélection de la base source de données selon les dates demandées
+  sources_data <- data.frame(source = "archives_dreal",
+                             date_debut = date_debut,
+                             date_fin = date_fin)
   
-  for(i in 0:(as.numeric(date_fin-date_debut)%/%6000))
+  # ordre de priorité : archives_dreal > hub_eau
+  if (date_fin > dates_dispo[dates_dispo$name == " archives_dreal", ]$end_date)
   {
-    print(i)
-
-    ifelse(date_fin<(date_debut+((i+1)*6000)), 
-                         date_fin_req<-date_fin, 
-                         date_fin_req<-date_debut+((i+1)*6000))
-
-    
-
-    
-    
-    
-    url_wps = paste0("https://wps.geosas.fr/simfenV2/?service=WPS&version=1.0.0&request=Execute&identifier=waterFlowSimulation&datainputs=X=",X,";Y=",Y,";Start=",(date_debut-1+i*6000),";End=",date_fin_req,";Project=archives_dreal;DeltaT=1440&RawDataOutput=SimulatedFlow")
-
-requete = httr::GET(url_wps)
-
-
-
-if (requete$status_code != 200) {
-    stop(paste0("erreur dans code :", requete$status_code))
-}
-
-debit= jsonlite::fromJSON(rawToChar(requete$content))
-colnames(debit) <- c('date','qjm')
-debit = as.data.frame(debit)
-debit$date=as.Date(debit$date)
-debit<-debit[2:nrow(debit),]
-
-ifelse(i==0, debit_out<-debit, debit_out<-rbind(debit_out, debit))
-# if(i>0){Sys.sleep(1)}   
+    sources_data <- data.frame(
+      source = c("archives_dreal",
+                 "hub_eau"),
+      date_debut = c(date_debut,
+                     dates_dispo[dates_dispo$name == " archives_dreal", ]$end_date +
+                       1),
+      date_fin = c(dates_dispo[dates_dispo$name == " archives_dreal", ]$end_date,
+                   date_fin)
+    )
   }
-debit_out<-unique(debit_out)
-
-names(debit_out)<-c("date_obs_elab", "resultat_obs_elab")
-debit_out$resultat_obs_elab<-as.numeric(debit_out$resultat_obs_elab)*1000
-return(debit_out)
+  
+  nb_lignes <- 6000
+  
+  for (k in 1:nrow(sources_data)) {
+    for (i in 0:(as.numeric(sources_data$date_fin[k] - sources_data$date_debut[k]) %/%
+                 nb_lignes))
+    {
+      ifelse(
+        sources_data$date_fin[k] < (sources_data$date_debut[k] + ((i + 1) * nb_lignes)),
+        date_fin_req <- sources_data$date_fin[k],
+        date_fin_req <-
+          sources_data$date_debut[k] + ((i + 1) * nb_lignes)
+      )
+      
+      
+      
+      url_wps = paste0(
+        "https://wps.geosas.fr/simfenV2/?service=WPS&version=1.0.0&request=Execute&identifier=waterFlowSimulation&datainputs=X=",
+        X,
+        ";Y=",
+        Y,
+        ";Start=",
+        (sources_data$date_debut[k] - 1 + i * 6000),
+        ";End=",
+        date_fin_req,
+        ";Project=",
+        sources_data$source[k],
+        ";DeltaT=1440&RawDataOutput=SimulatedFlow"
+      )
+      
+      
+      requete = httr::GET(url_wps)
+      
+      if (requete$status_code != 200) {
+        stop(paste0("erreur dans code :", requete$status_code))
+      }
+      
+      debit = jsonlite::fromJSON(rawToChar(requete$content))
+      colnames(debit) <- c('date', 'qjm')
+      debit = as.data.frame(debit)
+      debit$date = as.Date(debit$date)
+      debit <- debit[2:nrow(debit), ]
+      
+      ifelse(i == 0 &
+               k == 1,
+             debit_out <- debit,
+             debit_out <- rbind(debit_out, debit))
+      
+    }
+  }
+  debit_out <- unique(debit_out)
+  
+  names(debit_out) <- c("date_obs_elab", "resultat_obs_elab")
+  debit_out$resultat_obs_elab <-
+    as.numeric(debit_out$resultat_obs_elab) * 1000
+  return(debit_out)
 }
 
 #' importe_debit
 #' 
 #' Fonction pour importer des données de débit à partir des API SIMFEN
 #' https://geosas.fr/web/?page_id=3804
+#' La fonction exploite en priorité la base des archives DREAL et en complément celles hubeau
 #' 
 #' @param X : coordonnée du point à partir duquel on souhaite estimer les débits en Lambert 93
 #' @param Y :  coordonnée du point à partir duquel on souhaite estimer les débits en Lambert 93
@@ -152,7 +211,7 @@ return(debit_out)
 #' 
 #' ##############################
 #' 
-#' #CALCUL DU FLUX DE NITRATE SUR LA VILAINE A VEC SIMFEN
+#' #CALCUL DU FLUX DE NITRATE SUR LA VILAINE AVEC SIMFEN
 #' datafile <- system.file("nitrates.csv", package = "calculeflux")
 #' nitrates <- read.csv2(datafile, encoding = "UTF-8")
 #' 
@@ -162,7 +221,7 @@ return(debit_out)
 #' summary(nitrates$DatePrel)
 #' 
 #' 
-#' # import des débits sur le Semnon à Eancé
+#' # import des débits sur la Vilaine au niveau de la station hydro
 #' debit_vilaine<-importe_debit(X=314920, 
 #'                           Y=6732475, 
 #'                           date_debut=as.Date("2010-10-01"), 
@@ -203,70 +262,123 @@ return(debit_out)
 #'           estim\u00e9s \u00e0 l\'aide de l\'API SIMFEN / GEOSAS")
 #' 
 #' 
-#'  
-#' 
-#' 
-#' 
-importe_debit <- function(X, Y, date_debut, date_fin){
-  if(!("numeric"%in%class(X))){stop("X doit \u00eatre de type numeric")}  
-  if(!("numeric"%in%class(Y))){stop("Y doit \u00eatre de type numeric")} 
-  if(!("Date"%in%class(date_debut))){stop("date_debut doit \u00eatre de type Date")} 
-  if(!("Date"%in%class(date_fin))){stop("date_fin doit \u00eatre de type Date")}
-  if(date_fin<date_debut){stop("date_fin doit \u00eatre sup\u00e9rieure ou \u00e9gale \u00e0 date_debut")}
+importe_debit <- function(X, Y, date_debut, date_fin) {
+  if (!("numeric" %in% class(X))) {
+    stop("X doit \u00eatre de type numeric")
+  }
+  if (!("numeric" %in% class(Y))) {
+    stop("Y doit \u00eatre de type numeric")
+  }
+  if (!("Date" %in% class(date_debut))) {
+    stop("date_debut doit \u00eatre de type Date")
+  }
+  if (!("Date" %in% class(date_fin))) {
+    stop("date_fin doit \u00eatre de type Date")
+  }
+  if (date_fin < date_debut) {
+    stop("date_fin doit \u00eatre sup\u00e9rieure ou \u00e9gale \u00e0 date_debut")
+  }
   
   
   # teste si les dates demandées sont disponibles sous geosas
   dates_dispo <- importe_debit_dates_dispo()
+  
+  #on se limite aux modèles hub_eau et archive_dreal
+   dates_dispo<-dates_dispo[dates_dispo$name%in%c(" hub_eau"," archives_dreal"),]
+  
+  #temporaire car hub_eau est HS sous SIMFEN
+  dates_dispo<-dates_dispo[dates_dispo$name!=(" hub_eau"),]
+  
+  
   if (date_debut < min(dates_dispo$start_date)) {
-    stop(paste0(
-      "L\'API SIMPFEN n\'est pas disponible pour les dates ant\u00e9rieures \u00e0 ",
-      format(min(dates_dispo$start_date), "%d/%m/%Y")
-    ))
+    stop(
+      paste0(
+        "L\'API SIMPFEN n\'est pas disponible pour les dates ant\u00e9rieures \u00e0 ",
+        format(min(dates_dispo$start_date), "%d/%m/%Y")
+      )
+    )
   }
-    if (date_fin > max(dates_dispo$end_date)) {
-    stop(paste0(
-      "L\'API SIMPFEN n\'est pas disponible pour les dates post\u00e9rieures \u00e0 ",
-      format(max(dates_dispo$end_date), "%d/%m/%Y")
-    ))
+  if (date_fin > max(dates_dispo$end_date)) {
+    stop(
+      paste0(
+        "L\'API SIMPFEN n\'est pas disponible pour les dates post\u00e9rieures \u00e0 ",
+        format(max(dates_dispo$end_date), "%d/%m/%Y")
+      )
+    )
   }
   
-
+  # sélection de la base source de données selon les dates demandées
+  sources_data <- data.frame(source = "archives_dreal",
+                             date_debut = date_debut,
+                             date_fin = date_fin)
   
-  for(i in 0:(as.numeric(date_fin-date_debut)%/%6000))
+  # ordre de priorité : archives_dreal > hub_eau
+  if (date_fin > dates_dispo[dates_dispo$name == " archives_dreal", ]$end_date)
   {
-    print(i)
-
-    ifelse(date_fin<(date_debut+((i+1)*6000)), 
-                         date_fin_req<-date_fin, 
-                         date_fin_req<-date_debut+((i+1)*6000))
-
-    
-
-    
-    
-    
-    url_wps = paste0("https://wps.geosas.fr/simfenV2/?service=WPS&version=1.0.0&request=Execute&identifier=waterFlowSimulation&datainputs=X=",X,";Y=",Y,";Start=",(date_debut-1+i*6000),";End=",date_fin_req,";Project=archives_dreal;DeltaT=1440&RawDataOutput=SimulatedFlow")
-
-requete = httr::GET(url_wps)
-
-
-
-if (requete$status_code != 200) {
-    stop(paste0("erreur dans code :", requete$status_code))
-}
-
-debit= jsonlite::fromJSON(rawToChar(requete$content))
-colnames(debit) <- c('date','qjm')
-debit = as.data.frame(debit)
-debit$date=as.Date(debit$date)
-debit<-debit[2:nrow(debit),]
-
-ifelse(i==0, debit_out<-debit, debit_out<-rbind(debit_out, debit))
-# if(i>0){Sys.sleep(1)}   
+    sources_data <- data.frame(
+      source = c("archives_dreal",
+                 "hub_eau"),
+      date_debut = c(date_debut,
+                     dates_dispo[dates_dispo$name == " archives_dreal", ]$end_date +
+                       1),
+      date_fin = c(dates_dispo[dates_dispo$name == " archives_dreal", ]$end_date,
+                   date_fin)
+    )
   }
-debit_out<-unique(debit_out)
-
-names(debit_out)<-c("date_obs_elab", "resultat_obs_elab")
-debit_out$resultat_obs_elab<-as.numeric(debit_out$resultat_obs_elab)*1000
-return(debit_out)
+  
+  nb_lignes <- 6000
+  
+  for (k in 1:nrow(sources_data)) {
+    for (i in 0:(as.numeric(sources_data$date_fin[k] - sources_data$date_debut[k]) %/%
+                 nb_lignes))
+    {
+      ifelse(
+        sources_data$date_fin[k] < (sources_data$date_debut[k] + ((i + 1) * nb_lignes)),
+        date_fin_req <- sources_data$date_fin[k],
+        date_fin_req <-
+          sources_data$date_debut[k] + ((i + 1) * nb_lignes)
+      )
+      
+      
+      
+      url_wps = paste0(
+        "https://wps.geosas.fr/simfenV2/?service=WPS&version=1.0.0&request=Execute&identifier=waterFlowSimulation&datainputs=X=",
+        X,
+        ";Y=",
+        Y,
+        ";Start=",
+        (sources_data$date_debut[k] - 1 + i * 6000),
+        ";End=",
+        date_fin_req,
+        ";Project=",
+        sources_data$source[k],
+        ";DeltaT=1440&RawDataOutput=SimulatedFlow"
+      )
+      
+      
+      requete = httr::GET(url_wps)
+      
+      if (requete$status_code != 200) {
+        stop(paste0("erreur dans code :", requete$status_code))
+      }
+      
+      debit = jsonlite::fromJSON(rawToChar(requete$content))
+      colnames(debit) <- c('date', 'qjm')
+      debit = as.data.frame(debit)
+      debit$date = as.Date(debit$date)
+      debit <- debit[2:nrow(debit), ]
+      
+      ifelse(i == 0 &
+               k == 1,
+             debit_out <- debit,
+             debit_out <- rbind(debit_out, debit))
+      
+    }
+  }
+  debit_out <- unique(debit_out)
+  
+  names(debit_out) <- c("date_obs_elab", "resultat_obs_elab")
+  debit_out$resultat_obs_elab <-
+    as.numeric(debit_out$resultat_obs_elab) * 1000
+  return(debit_out)
 }

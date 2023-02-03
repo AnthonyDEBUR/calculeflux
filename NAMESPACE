@@ -3,6 +3,7 @@
 export("%>%")
 export(calcule_flux)
 export(calcule_hydraulicite)
+export(importe_BV_amont)
 export(importe_debit)
 export(importe_debit_dates_dispo)
 importFrom(magrittr,"%>%")

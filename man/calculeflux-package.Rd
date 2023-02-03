@@ -8,6 +8,14 @@
 \description{
 Package to calculate nitrogen and phosphorus fluxes in streams. Calculation of fluxes with differents methods described in https://revue-set.fr/article/view/6291.
 }
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/AnthonyDEBUR/calculeflux}
+  \item Report bugs at \url{https://github.com/AnthonyDEBUR/calculeflux/issues}
+}
+
+}
 \author{
 \strong{Maintainer}: Anthony DE BURGHRAVE \email{anthony.deburghrave@eaux-et-vilaine.bzh}
 
