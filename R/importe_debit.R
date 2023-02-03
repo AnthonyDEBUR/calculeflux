@@ -24,7 +24,25 @@ importe_debit <- function(X, Y, date_debut, date_fin){
   if(!("Date"%in%class(date_debut))){stop("date_debut doit \u00eatre de type Date")} 
   if(!("Date"%in%class(date_fin))){stop("date_fin doit \u00eatre de type Date")}
   if(date_fin<date_debut){stop("date_fin doit \u00eatre sup\u00e9rieure ou \u00e9gale \u00e0 date_debut")}
+  
+  
+  # teste si les dates demandées sont disponibles sous geosas
+  dates_dispo <- importe_debit_dates_dispo()
+  if (date_debut < min(dates_dispo$start_date)) {
+    stop(paste0(
+      "L\'API SIMPFEN n\'est pas disponible pour les dates ant\u00e9rieures \u00e0 ",
+      format(min(dates_dispo$start_date), "%d/%m/%Y")
+    ))
+  }
+    if (date_fin > max(dates_dispo$end_date)) {
+    stop(paste0(
+      "L\'API SIMPFEN n\'est pas disponible pour les dates post\u00e9rieures \u00e0 ",
+      format(max(dates_dispo$end_date), "%d/%m/%Y")
+    ))
+  }
+  
 
+  
   for(i in 0:(as.numeric(date_fin-date_debut)%/%6000))
   {
     print(i)
@@ -32,10 +50,17 @@ importe_debit <- function(X, Y, date_debut, date_fin){
     ifelse(date_fin<(date_debut+((i+1)*6000)), 
                          date_fin_req<-date_fin, 
                          date_fin_req<-date_debut+((i+1)*6000))
+
+    
+
+    
+    
     
     url_wps = paste0("https://wps.geosas.fr/simfenV2/?service=WPS&version=1.0.0&request=Execute&identifier=waterFlowSimulation&datainputs=X=",X,";Y=",Y,";Start=",(date_debut-1+i*6000),";End=",date_fin_req,";Project=archives_dreal;DeltaT=1440&RawDataOutput=SimulatedFlow")
 
 requete = httr::GET(url_wps)
+
+
 
 if (requete$status_code != 200) {
     stop(paste0("erreur dans code :", requete$status_code))
@@ -111,7 +136,6 @@ return(debit_out)
 #' 
 #' annees<-seq(2011,2021)
 #' tmp<-lapply(annees, calcul_flux_annuel)
-#' 
 #' tmp<-unlist(tmp)
 #' rslt_semnon<-data.frame(annee_hydro=paste0(annees, " - ", annees+1), flux=tmp/1000)
 #' 
@@ -189,7 +213,25 @@ importe_debit <- function(X, Y, date_debut, date_fin){
   if(!("Date"%in%class(date_debut))){stop("date_debut doit \u00eatre de type Date")} 
   if(!("Date"%in%class(date_fin))){stop("date_fin doit \u00eatre de type Date")}
   if(date_fin<date_debut){stop("date_fin doit \u00eatre sup\u00e9rieure ou \u00e9gale \u00e0 date_debut")}
+  
+  
+  # teste si les dates demandées sont disponibles sous geosas
+  dates_dispo <- importe_debit_dates_dispo()
+  if (date_debut < min(dates_dispo$start_date)) {
+    stop(paste0(
+      "L\'API SIMPFEN n\'est pas disponible pour les dates ant\u00e9rieures \u00e0 ",
+      format(min(dates_dispo$start_date), "%d/%m/%Y")
+    ))
+  }
+    if (date_fin > max(dates_dispo$end_date)) {
+    stop(paste0(
+      "L\'API SIMPFEN n\'est pas disponible pour les dates post\u00e9rieures \u00e0 ",
+      format(max(dates_dispo$end_date), "%d/%m/%Y")
+    ))
+  }
+  
 
+  
   for(i in 0:(as.numeric(date_fin-date_debut)%/%6000))
   {
     print(i)
@@ -197,10 +239,17 @@ importe_debit <- function(X, Y, date_debut, date_fin){
     ifelse(date_fin<(date_debut+((i+1)*6000)), 
                          date_fin_req<-date_fin, 
                          date_fin_req<-date_debut+((i+1)*6000))
+
+    
+
+    
+    
     
     url_wps = paste0("https://wps.geosas.fr/simfenV2/?service=WPS&version=1.0.0&request=Execute&identifier=waterFlowSimulation&datainputs=X=",X,";Y=",Y,";Start=",(date_debut-1+i*6000),";End=",date_fin_req,";Project=archives_dreal;DeltaT=1440&RawDataOutput=SimulatedFlow")
 
 requete = httr::GET(url_wps)
+
+
 
 if (requete$status_code != 200) {
     stop(paste0("erreur dans code :", requete$status_code))

@@ -74,7 +74,6 @@ calcul_flux_annuel<-function(annee)
 
 annees<-seq(2011,2021)
 tmp<-lapply(annees, calcul_flux_annuel)
-
 tmp<-unlist(tmp)
 rslt_semnon<-data.frame(annee_hydro=paste0(annees, " - ", annees+1), flux=tmp/1000)
 

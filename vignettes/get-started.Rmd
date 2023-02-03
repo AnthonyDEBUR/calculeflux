@@ -320,6 +320,26 @@ ggplot2::ggplot(tmp, ggplot2::aes(annee, hydraulicite)) +
   
 
   
+  
+
+# importe_debit_dates_dispo
+
+    
+
+  
+
+```{r example-importe_debit_dates_dispo}
+importe_debit_dates_dispo()
+```
+
+  
+
+    
+  
+  
+  
+  
+  
 
 # importe_debit
 
@@ -375,7 +395,6 @@ calcul_flux_annuel<-function(annee)
 
 annees<-seq(2011,2021)
 tmp<-lapply(annees, calcul_flux_annuel)
-
 tmp<-unlist(tmp)
 rslt_semnon<-data.frame(annee_hydro=paste0(annees, " - ", annees+1), flux=tmp/1000)
 
