@@ -475,8 +475,13 @@ ggplot2::ggplot(flux_vilaine_simfen, ggplot2::aes(annee_hydro, flux)) +
   
 
 ```{r example-importe_BV_amont}
+# Pt en Bretagne
 shp<-importe_BV_amont(X=381425.6,
                       Y=6755598)
+
+# Pt hors Bretagne
+# shp<-importe_BV_amont(X=336599,
+#                       Y=6674450)
 
 plot(sf::st_geometry(shp))
 
@@ -509,8 +514,8 @@ annees=c(2010,2014)
 
 flux_vilaine<-calcule_flux_annuels(annees=c(2010,2021),
                      mois_debut=10,
-                     analyses=nitrates,
-                     debit=debit
+                     analyses0=nitrates,
+                     debit0=debit
                      )
 
 

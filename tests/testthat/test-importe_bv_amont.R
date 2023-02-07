@@ -26,8 +26,8 @@ annees=c(2010,2014)
 
 flux_vilaine<-calcule_flux_annuels(annees=c(2010,2021),
                      mois_debut=10,
-                     analyses=nitrates,
-                     debit=debit
+                     analyses0=nitrates,
+                     debit0=debit
                      )
   
   expect_true(nrow(flux_vilaine)>0) 

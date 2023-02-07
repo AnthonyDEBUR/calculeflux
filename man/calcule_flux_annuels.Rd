@@ -7,10 +7,10 @@
 calcule_flux_annuels(
   annees,
   mois_debut = 10,
-  analyses,
+  analyses0,
   col_dates_anal = "DatePrel",
   col_analyses = "RsAna",
-  debit,
+  debit0,
   col_dates_debit = "date_obs_elab",
   col_valeurs_debits = "resultat_obs_elab",
   methode = "M6",
@@ -25,7 +25,7 @@ years 2010-2011, 2011-2012 and 2012-2013, annees should be equal to c(2010,2012)
 \item{mois_debut}{: numeric indicating wich month to start the hydraulic year
 with. Default is 10 (for october).}
 
-\item{analyses}{: data.frame with nitrates results for the different dates}
+\item{analyses0}{: data.frame with nitrates results for the different dates}
 
 \item{col_dates_anal}{: character indicating the name of the column of analyses
 in which dates are stored. Default = "DatePrel"}
@@ -33,7 +33,7 @@ in which dates are stored. Default = "DatePrel"}
 \item{col_analyses}{: character indicating the name of the column of analyses
 in which results are stored. Default = "RsAna"}
 
-\item{debit}{: data.frame with daily flow rates results for the different dates}
+\item{debit0}{: data.frame with daily flow rates results for the different dates}
 
 \item{col_dates_debit}{: character indicating the name of the column of debit
 in which dates are stored. Default = "date_obs_elab"}
@@ -87,8 +87,8 @@ annees=c(2010,2014)
 
 flux_vilaine<-calcule_flux_annuels(annees=c(2010,2021),
                      mois_debut=10,
-                     analyses=nitrates,
-                     debit=debit
+                     analyses0=nitrates,
+                     debit0=debit
                      )
 
 

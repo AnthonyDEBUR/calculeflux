@@ -10,12 +10,12 @@
 #' years 2010-2011, 2011-2012 and 2012-2013, annees should be equal to c(2010,2012)
 #' @param mois_debut : numeric indicating wich month to start the hydraulic year 
 #' with. Default is 10 (for october).
-#' @param analyses : data.frame with nitrates results for the different dates
+#' @param analyses0 : data.frame with nitrates results for the different dates
 #' @param col_dates_anal : character indicating the name of the column of analyses
 #' in which dates are stored. Default = "DatePrel"
 #' @param col_analyses : character indicating the name of the column of analyses
 #' in which results are stored. Default = "RsAna"
-#' @param debit : data.frame with daily flow rates results for the different dates
+#' @param debit0 : data.frame with daily flow rates results for the different dates
 #' @param col_dates_debit : character indicating the name of the column of debit
 #' in which dates are stored. Default = "date_obs_elab"
 #' @param col_valeurs_debits : character indicating the name of the column of debit
@@ -59,24 +59,26 @@
 #' 
 #' flux_vilaine<-calcule_flux_annuels(annees=c(2010,2021),
 #'                      mois_debut=10,
-#'                      analyses=nitrates,
-#'                      debit=debit
+#'                      analyses0=nitrates,
+#'                      debit0=debit
 #'                      )
 #' 
 #' 
 #' 
 calcule_flux_annuels <- function(annees, 
                                  mois_debut=10, 
-                                 analyses, 
+                                 analyses0, 
                                  col_dates_anal="DatePrel",
                                  col_analyses="RsAna",
-                                 debit,
+                                 debit0,
                                  col_dates_debit="date_obs_elab",
                                  col_valeurs_debits="resultat_obs_elab",
                                  methode="M6",
                                  out="flux_hydrau_pond",
                                  minimum_rs_ana=6){
   
+  #astuces pour éviter note no visible binding for global variable
+  RsAna <- date_obs_elab <- resultat_obs_elab<- annee_hydro<- NULL
   
   if (!"numeric" %in% class(annees)) {
     stop("calcule_flux_annuels : annees must be a numeric vector")
@@ -92,13 +94,13 @@ calcule_flux_annuels <- function(annees,
   if (!all(mois_debut %in% seq(1, 12))) {
     stop("calcule_flux_annuels : mois_debut is not a valid month")
   }
-  if (!"data.frame" %in% class(analyses)) {
+  if (!"data.frame" %in% class(analyses0)) {
     stop("calcule_flux_annuels : analyses must be a data.frame")
   }
   if (!"character" %in% class(col_dates_anal)) {
     stop("calcule_flux_annuels : col_dates_anal must be a character")
   }
-  if (!col_dates_anal %in% colnames(analyses)) {
+  if (!col_dates_anal %in% colnames(analyses0)) {
     stop(
       "calcule_flux_annuels : col_dates_anal must be the name of one column of analyses data.frame"
     )
@@ -106,18 +108,18 @@ calcule_flux_annuels <- function(annees,
    if (!"character" %in% class(col_analyses)) {
     stop("calcule_flux_annuels : col_dates_anal must be a character")
   }
-  if (!col_analyses %in% colnames(analyses)) {
+  if (!col_analyses %in% colnames(analyses0)) {
     stop(
       "calcule_flux_annuels : col_analyses must be the name of one column of analyses data.frame"
     )
   } 
-  if (!"data.frame" %in% class(debit)) {
+  if (!"data.frame" %in% class(debit0)) {
     stop("calcule_flux_annuels : debit must be a data.frame")
   }
   if (!"character" %in% class(col_dates_debit)) {
     stop("calcule_flux_annuels : col_dates_debit must be a character")
   }
-  if (!col_dates_debit %in% colnames(debit)) {
+  if (!col_dates_debit %in% colnames(debit0)) {
     stop(
       "calcule_flux_annuels : col_dates_debit must be the name of one column of debit data.frame"
     )
@@ -125,7 +127,7 @@ calcule_flux_annuels <- function(annees,
    if (!"character" %in% class(col_valeurs_debits)) {
     stop("calcule_flux_annuels : col_valeurs_debits must be a character")
   }
-  if (!col_valeurs_debits %in% colnames(debit)) {
+  if (!col_valeurs_debits %in% colnames(debit0)) {
     stop(
       "calcule_flux_annuels : col_valeurs_debits must be the name of one column of debit data.frame"
     )
@@ -139,7 +141,7 @@ calcule_flux_annuels <- function(annees,
     )
   } 
   
-  debit <- debit[, c(col_dates_debit, col_valeurs_debits)]
+  debit <- debit0[, c(col_dates_debit, col_valeurs_debits)]
   names(debit) <- c("date_obs_elab",
                     "resultat_obs_elab")
   if (!"Date" %in% class(debit$date_obs_elab)) {
@@ -166,7 +168,7 @@ calcule_flux_annuels <- function(annees,
     )
   }
   
-  analyses<-analyses[,c(col_dates_anal,col_analyses)]
+  analyses<-analyses0[,c(col_dates_anal,col_analyses)]
   names(analyses)<-c("DatePrel", "RsAna")
 
  if (!"Date" %in% class(analyses$DatePrel)) {
@@ -306,8 +308,13 @@ return(resultat)
 #' 
 #' @export
 #' @examples
+#' # Pt en Bretagne
 #' shp<-importe_BV_amont(X=381425.6,
 #'                       Y=6755598)
+#' 
+#' # Pt hors Bretagne
+#' # shp<-importe_BV_amont(X=336599,
+#' #                       Y=6674450)
 #' 
 #' plot(sf::st_geometry(shp))
 #' 
@@ -325,7 +332,8 @@ importe_BV_amont <- function(X, Y){
         X,
         ";Y=",
         Y,
-        ";formatOut=GeoJSON&rawdataoutput=bvOut"
+        # ";formatOut=GeoJSON&MNT=France%20250m%20en%20test&rawdataoutput=bvOut"
+            ";formatOut=GeoJSON&Bretagne%2025m&rawdataoutput=bvOut"
       )
     
        requete <- httr::GET(url_wps)

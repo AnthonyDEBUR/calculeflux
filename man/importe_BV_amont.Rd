@@ -19,8 +19,13 @@ Function to calculate watershed using GEOSAS API MNT Surf
 https://geosas.fr/web/?page_id=5877
 }
 \examples{
+# Pt en Bretagne
 shp<-importe_BV_amont(X=381425.6,
                       Y=6755598)
+
+# Pt hors Bretagne
+# shp<-importe_BV_amont(X=336599,
+#                       Y=6674450)
 
 plot(sf::st_geometry(shp))
 
