@@ -470,10 +470,6 @@ ggplot2::ggplot(flux_vilaine_simfen, ggplot2::aes(annee_hydro, flux)) +
 
 # importe_BV_amont
 
-    
-
-  
-
 ```{r example-importe_BV_amont}
 # Pt en Bretagne
 shp<-importe_BV_amont(X=381425.6,
