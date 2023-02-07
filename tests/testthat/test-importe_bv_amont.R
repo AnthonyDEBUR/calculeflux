@@ -8,3 +8,27 @@ test_that("importe_BV_amont works", {
   expect_true(is.numeric(shp$surface_ha))
   
 })
+
+test_that("calcule_flux_annuels works", {
+  datafile <- system.file("nitrates.csv", package = "calculeflux")
+nitrates <- read.csv2(datafile, encoding = "UTF-8")
+nitrates$DatePrel<-nitrates$DatePrel%>%as.Date()
+
+
+datafile <- system.file("debit.csv", package = "calculeflux")
+debit <- read.csv2(datafile, encoding = "UTF-8")
+debit$date_obs_elab<-debit$date_obs_elab%>%as.Date()
+
+annees=c(2010,2014)
+ mois_debut<-9
+  
+
+
+flux_vilaine<-calcule_flux_annuels(annees=c(2010,2021),
+                     mois_debut=10,
+                     analyses=nitrates,
+                     debit=debit
+                     )
+  
+  expect_true(nrow(flux_vilaine)>0) 
+})
