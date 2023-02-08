@@ -10,12 +10,12 @@
 #' years 2010-2011, 2011-2012 and 2012-2013, annees should be equal to c(2010,2012)
 #' @param mois_debut : numeric indicating wich month to start the hydraulic year 
 #' with. Default is 10 (for october).
-#' @param analyses0 : data.frame with nitrates results for the different dates
+#' @param analyses0 : data.frame with nitrates results for the different dates (mg/L)
 #' @param col_dates_anal : character indicating the name of the column of analyses
 #' in which dates are stored. Default = "DatePrel"
 #' @param col_analyses : character indicating the name of the column of analyses
 #' in which results are stored. Default = "RsAna"
-#' @param debit0 : data.frame with daily flow rates results for the different dates
+#' @param debit0 : data.frame with daily flow rates results for the different dates (L/s)
 #' @param col_dates_debit : character indicating the name of the column of debit
 #' in which dates are stored. Default = "date_obs_elab"
 #' @param col_valeurs_debits : character indicating the name of the column of debit
@@ -31,10 +31,13 @@
 #' 
 #' 
 #' @return data.frame with columns :
-#' - annee_hydro : hydraulical years,
+#' - annee_hydro : hydraulical year
 #' - N_RsAna : number of data of concentration
 #' - N_Qjm : number of daily flow rate
+#' - nb_jours : number of days during the hydraulical year
+#' - debit_tot : annual flow rate in m3/year
 #' - flux : flux in kg/year (if analyses in mg/L)
+#' - Cmoy :mean of concentration = flux / debit_tot in mg/L
 #' - hydraulicity : hydraulicity
 #' - flux_pond : flux ponderate by hydraulicity in kg/year (if analyses in mg/L)
 #' 
@@ -52,12 +55,12 @@
 #' debit <- read.csv2(datafile, encoding = "UTF-8")
 #' debit$date_obs_elab<-debit$date_obs_elab%>%as.Date()
 #' 
-#' annees=c(2010,2014)
+#' annees=c(1971,2014)
 #'  mois_debut<-9
 #'   
 #' 
 #' 
-#' flux_vilaine<-calcule_flux_annuels(annees=c(2010,2021),
+#' flux_vilaine<-calcule_flux_annuels(annees=c(2010,2015),
 #'                      mois_debut=10,
 #'                      analyses0=nitrates,
 #'                      debit0=debit
@@ -231,12 +234,28 @@ resultat_Q<-debit%>%
   dplyr::group_by(annee_hydro)%>%
   dplyr::summarise(N_Qjm=dplyr::n())
   
+
+Qannuel<-debit%>%
+  subset(!is.na(annee_hydro))%>%
+  dplyr::group_by(annee_hydro)%>%
+  dplyr::summarise(debit_an=sum(resultat_obs_elab, na.rm=TRUE))
+
 resultat_C<-analyses%>%
   subset(!is.na(annee_hydro))%>%
   dplyr::group_by(annee_hydro)%>%
   dplyr::summarise(N_RsAna=dplyr::n())
 
 resultat<-dplyr::full_join(resultat_C, resultat_Q, by="annee_hydro")
+
+nb_jours<-data.frame(annee_hydro=lbl_coupure,
+  nb_jours=difftime(seuils_coupure[2:length(seuils_coupure)],
+                   seuils_coupure[1:length(seuils_coupure)-1],
+                   units="days")%>%as.numeric)
+
+resultat<-dplyr::full_join(resultat, nb_jours, by="annee_hydro")
+resultat<-dplyr::full_join(resultat, Qannuel, by="annee_hydro")
+resultat$debit_an<-resultat$debit_an/resultat$N_Qjm*resultat$nb_jours*24*3600/1000
+
 
 # calcul du flux si demandé
 if(out%in%c("flux", "flux_hydrau_pond"))
@@ -255,12 +274,19 @@ calcul_flux_annuel<-function(i)
   date_fin_calcul=(seuils_coupure[i]+lubridate::years(1))-1
 )
 }
- resultat$flux<-
-   lapply(seq(1,length(lbl_coupure)), calcul_flux_annuel)%>%
+
+# periodes à calculer : nb résultat analyses suffisant et existence de aleurs de débit
+a_calculer<-seq(1,length(lbl_coupure))[resultat$N_RsAna>minimum_rs_ana & !is.na(resultat$N_Qjm) &!is.na(resultat$N_RsAna>minimum_rs_ana)]
+
+ resultat$flux<-NA
+ resultat$flux[a_calculer]<-
+   lapply(a_calculer, calcul_flux_annuel)%>%
                  unlist()
 
  # suppression des flux calculés les années où il n'y a pas  assez d'analyses
- resultat[resultat$N_RsAna<=minimum_rs_ana,]$flux<-NA
+ try(resultat[resultat$N_RsAna<=minimum_rs_ana,]$flux<-NA, silent=TRUE)
+ 
+ resultat$Cmoy<-resultat$flux/resultat$debit_an*1000
  
 }
 
@@ -277,8 +303,13 @@ calcul_hydrau_annuel<-function(i)
   date_fin_calcul=(seuils_coupure[i]+lubridate::years(1))-1
 )
 }
- resultat$hydraulicity<-
-   lapply(seq(1,length(lbl_coupure)), calcul_hydrau_annuel)%>%
+# periodes à calculer : nb résultat analyses suffisant et existence de aleurs de débit
+a_calculer<-seq(1,length(lbl_coupure))[!is.na(resultat$N_Qjm)]
+
+resultat$hydraulicity<-NA
+
+ resultat$hydraulicity[a_calculer]<-
+   lapply(a_calculer, calcul_hydrau_annuel)%>%
                  unlist()
 
 }

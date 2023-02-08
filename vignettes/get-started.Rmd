@@ -470,6 +470,10 @@ ggplot2::ggplot(flux_vilaine_simfen, ggplot2::aes(annee_hydro, flux)) +
 
 # importe_BV_amont
 
+    
+
+  
+
 ```{r example-importe_BV_amont}
 # Pt en Bretagne
 shp<-importe_BV_amont(X=381425.6,
@@ -505,12 +509,12 @@ datafile <- system.file("debit.csv", package = "calculeflux")
 debit <- read.csv2(datafile, encoding = "UTF-8")
 debit$date_obs_elab<-debit$date_obs_elab%>%as.Date()
 
-annees=c(2010,2014)
+annees=c(1971,2014)
  mois_debut<-9
   
 
 
-flux_vilaine<-calcule_flux_annuels(annees=c(2010,2021),
+flux_vilaine<-calcule_flux_annuels(annees=c(2010,2015),
                      mois_debut=10,
                      analyses0=nitrates,
                      debit0=debit

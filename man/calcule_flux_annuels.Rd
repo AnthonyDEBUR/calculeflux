@@ -25,7 +25,7 @@ years 2010-2011, 2011-2012 and 2012-2013, annees should be equal to c(2010,2012)
 \item{mois_debut}{: numeric indicating wich month to start the hydraulic year
 with. Default is 10 (for october).}
 
-\item{analyses0}{: data.frame with nitrates results for the different dates}
+\item{analyses0}{: data.frame with nitrates results for the different dates (mg/L)}
 
 \item{col_dates_anal}{: character indicating the name of the column of analyses
 in which dates are stored. Default = "DatePrel"}
@@ -33,7 +33,7 @@ in which dates are stored. Default = "DatePrel"}
 \item{col_analyses}{: character indicating the name of the column of analyses
 in which results are stored. Default = "RsAna"}
 
-\item{debit0}{: data.frame with daily flow rates results for the different dates}
+\item{debit0}{: data.frame with daily flow rates results for the different dates (L/s)}
 
 \item{col_dates_debit}{: character indicating the name of the column of debit
 in which dates are stored. Default = "date_obs_elab"}
@@ -55,10 +55,13 @@ or less data of concentrations}
 \value{
 data.frame with columns :
 \itemize{
-\item annee_hydro : hydraulical years,
+\item annee_hydro : hydraulical year
 \item N_RsAna : number of data of concentration
 \item N_Qjm : number of daily flow rate
+\item nb_jours : number of days during the hydraulical year
+\item debit_tot : annual flow rate in m3/year
 \item flux : flux in kg/year (if analyses in mg/L)
+\item Cmoy :mean of concentration = flux / debit_tot in mg/L
 \item hydraulicity : hydraulicity
 \item flux_pond : flux ponderate by hydraulicity in kg/year (if analyses in mg/L)
 }
@@ -80,12 +83,12 @@ datafile <- system.file("debit.csv", package = "calculeflux")
 debit <- read.csv2(datafile, encoding = "UTF-8")
 debit$date_obs_elab<-debit$date_obs_elab\%>\%as.Date()
 
-annees=c(2010,2014)
+annees=c(1971,2014)
  mois_debut<-9
   
 
 
-flux_vilaine<-calcule_flux_annuels(annees=c(2010,2021),
+flux_vilaine<-calcule_flux_annuels(annees=c(2010,2015),
                      mois_debut=10,
                      analyses0=nitrates,
                      debit0=debit

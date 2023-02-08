@@ -10,7 +10,7 @@ datafile <- system.file("debit.csv", package = "calculeflux")
 debit <- read.csv2(datafile, encoding = "UTF-8")
 debit$date_obs_elab<-debit$date_obs_elab%>%as.Date()
 
-flux_vilaine<-calcule_flux_annuels(annees=c(2010,2021),
+flux_vilaine<-calcule_flux_annuels(annees=c(2016,2021),
                      mois_debut=10,
                      analyses0=nitrates,
                      debit0=debit
