@@ -17,7 +17,7 @@ utils::globalVariables(c("DatePrel", "jour_mois"))
 #' M9 : Méthode M2 corrigée par un facteur multiplicatif prenant en compte les débits aux instants où l’on n’effectue pas de prélèvements (Cooper, 2004)
 #' 
 #' Dates date_debut_calcul and date_fin_calcul are included in calculus.
-#' if more than one result of analysis or flow rate is available for a same day, tehn the mean of all non-NA values is used.
+#' if more than one result of analysis or flow rate is available for a same day, then the mean of all non-NA values is used.
 #' 
 #' @param analyses dataframe with the concentrations required for calculus. Concentration in mg/L
 #' @param col_dates_anal Name of the column with date of measurement of concentrations. By default : DatePrel
@@ -240,7 +240,7 @@ calcule_flux <- function(analyses,
   if (!any(class(debit[[col_dates_debit]]) %in% c("Date", "POSIXct", "POSIXt", "POSIXlt"))) {
     stop("Class of flow rates dates should be date, POSIXct or POSIXlt")
   }
-  if (!class(analyses[[col_analyses]]) %in% c("numeric")) {
+  if (!is.numeric(analyses[[col_analyses]])) {
     stop("Class of analysis results should be numeric")
   }
   if (!class(debit[[col_debits]]) %in% c("numeric")) {

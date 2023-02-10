@@ -35,7 +35,7 @@
 #' - N_RsAna : number of data of concentration
 #' - N_Qjm : number of daily flow rate
 #' - nb_jours : number of days during the hydraulical year
-#' - debit_tot : annual flow rate in m3/year
+#' - debit_an : annual flow rate in m3/year
 #' - flux : flux in kg/year (if analyses in mg/L)
 #' - Cmoy :mean of concentration = flux / debit_tot in mg/L
 #' - hydraulicity : hydraulicity
@@ -80,7 +80,7 @@ calcule_flux_annuels <- function(annees,
                                  out="flux_hydrau_pond",
                                  minimum_rs_ana=6){
   
-  #astuces pour éviter note no visible binding for global variable
+  #astuce pour éviter note no visible binding for global variable
   RsAna <- date_obs_elab <- resultat_obs_elab<- annee_hydro<- NULL
   
   if (!"numeric" %in% class(annees)) {

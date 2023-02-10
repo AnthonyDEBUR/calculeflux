@@ -51,7 +51,7 @@ M6 : Linear interpolation of C (Moatar and Meybeck, 2005)
 M9 : Méthode M2 corrigée par un facteur multiplicatif prenant en compte les débits aux instants où l’on n’effectue pas de prélèvements (Cooper, 2004)
 
 Dates date_debut_calcul and date_fin_calcul are included in calculus.
-if more than one result of analysis or flow rate is available for a same day, tehn the mean of all non-NA values is used.
+if more than one result of analysis or flow rate is available for a same day, then the mean of all non-NA values is used.
 }
 \examples{
 

@@ -59,7 +59,7 @@ data.frame with columns :
 \item N_RsAna : number of data of concentration
 \item N_Qjm : number of daily flow rate
 \item nb_jours : number of days during the hydraulical year
-\item debit_tot : annual flow rate in m3/year
+\item debit_an : annual flow rate in m3/year
 \item flux : flux in kg/year (if analyses in mg/L)
 \item Cmoy :mean of concentration = flux / debit_tot in mg/L
 \item hydraulicity : hydraulicity

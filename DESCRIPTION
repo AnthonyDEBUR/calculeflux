@@ -19,6 +19,7 @@ Imports:
     magrittr,
     rlang,
     sf,
+    stringr,
     utils,
     xml2,
     zoo
