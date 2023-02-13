@@ -57,8 +57,8 @@ importe_debit_hubeau <-   function(code_entite,
         date_debut_obs_elab = date_debut_obs_elab,
         date_fin_obs_elab = date_fin_obs_elab,
         size = 5000,
-        grandeur_hydro_elab="QmJ",
-        fields = "code_station,date_obs_elab,resultat_obs_elab"
+        grandeur_hydro_elab="QmJ"
+        # , fields = "code_station,date_obs_elab,resultat_obs_elab"
       )
     )
 
