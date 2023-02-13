@@ -529,31 +529,69 @@ flux_vilaine<-calcule_flux_annuels(annees=c(2010,2015),
   
   
 
+# importe_debit_hubeau
+
+    
+
+  
+
+```{r example-importe_debit_hubeau}
+test<-importe_debit_hubeau(code_entite="J9300611",
+                     date_debut_obs_elab=as.Date("2010-01-01"),
+                     date_fin_obs_elab=as.Date("2012-12-31"))
+```
+
+  
+
+  
+
+# importe_stations_hydrometriques_hubeau
+
+    
+
+  
+
+```{r example-importe_stations_hydrometriques_hubeau}
+utils::data(sage_vilaine, package="calculeflux")
+  test<-importe_stations_hydrometriques_hubeau(emprise=sage_vilaine)
+
+  plot(sage_vilaine)
+  plot(test, add=TRUE)
+```
+
+  
+
+  
+  
+
+# importe_qualite_hubeau
+
+    
+
+  
+
+```{r example-importe_qualite_hubeau}
+donnees<-importe_qualite_hubeau(code_station="04211950", 
+                                code_parametre = "1340",
+                                code_support="3")
 
 
-## Use sub-functions in the same chunk
+```
 
-<!--
+  
 
-# There can be development actions
+    
+  
+  
 
-Create a chunk with 'development' actions
+# sage_vilaine
 
-- The chunk needs to be named `development` or `dev`
-- It contains functions that are used for package development only
-- Note that you may want to store most of these functions in the 0-dev_history.Rmd file
+    
 
-These are only included in the present flat template file, their content will not be part of the package anywhere else.
--->
+  
 
 
-# Inflate your package
+  
 
-You're one inflate from paper to box.
-Build your package from this very Rmd using `fusen::inflate()`
 
-- Verify your `"DESCRIPTION"` file has been updated
-- Verify your function is in `"R/"` directory
-- Verify your test is in `"tests/testthat/"` directory
-- Verify this Rmd appears in `"vignettes/"` directory
 
