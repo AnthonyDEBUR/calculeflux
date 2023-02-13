@@ -18,6 +18,10 @@ importe_qualite_hubeau(
 
 \item{code_parametre}{character or vector with the code of required parameter (optional)}
 
+\item{code_support}{character or vector with the code of the support of analysis (optional)}
+
+\item{code_fraction}{character or vector with the code of the fraction of analysis (optional)#'}
+
 \item{date_debut}{start date of observations to retrieve (optional)}
 
 \item{date_fin}{end date of observations to retrieve (optional)}
@@ -34,9 +38,12 @@ HUB'EAU API (https://hubeau.eaufrance.fr/page/api-hydrometrie).
 All codes comes from https://www.sandre.eaufrance.fr/Rechercher-un-jeu-de-donnees.
 }
 \examples{
-donnees<-importe_qualite_hubeau(code_station="04211950", 
+
+donnees<-importe_qualite_hubeau(code_station=c("04161595", "04162000", "03174000", "03173000"), 
                                 code_parametre = "1340",
-                                code_support="3")
+                                code_support="3",
+                                           date_debut = as.Date("1995-01-01"),
+                                       date_fin = as.Date("2019-12-31"))
 
 
 }

@@ -85,7 +85,7 @@ importe_debit_hubeau <-   function(code_entite,
       
       url<-"a"
 
-      while (data$status_code == 206 & nchar("url">0))
+      while (data$status_code == 206 & any(nchar(url)>0))
       {
         # on recupere url page suivante
         url <- data$headers$link %>% stringr::str_split("<")
@@ -94,7 +94,8 @@ importe_debit_hubeau <-   function(code_entite,
         url <- unlist(url)
         url <- url[grep("; rel=\"next\"", url) - 1]
 
-        data <- httr::GET(url)
+        if(length(url)>0)
+       { data <- httr::GET(url)
 
         data1 <- data %>%
           httr::content(as = 'text', encoding = "UTF-8") %>%
@@ -104,7 +105,7 @@ importe_debit_hubeau <-   function(code_entite,
         if (!is.null(nrow(data1)))
         {
           data0 <- dplyr::bind_rows(data0, data1)
-        }
+        }}
       }
 
 

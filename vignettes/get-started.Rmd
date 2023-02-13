@@ -571,9 +571,12 @@ utils::data(sage_vilaine, package="calculeflux")
   
 
 ```{r example-importe_qualite_hubeau}
-donnees<-importe_qualite_hubeau(code_station="04211950", 
+
+donnees<-importe_qualite_hubeau(code_station=c("04161595", "04162000"), 
                                 code_parametre = "1340",
-                                code_support="3")
+                                code_support="3",
+                                           date_debut = as.Date("1995-01-01"),
+                                       date_fin = as.Date("2019-12-31"))
 
 
 ```

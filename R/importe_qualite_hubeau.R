@@ -9,7 +9,8 @@
 #' 
 #' @param code_station character or vector with the code of the measurement(s) station(s) 
 #' @param code_parametre character or vector with the code of required parameter (optional)
-#' 
+#' @param code_support character or vector with the code of the support of analysis (optional)
+#' @param code_fraction character or vector with the code of the fraction of analysis (optional)#' 
 #' @param date_debut start date of observations to retrieve (optional)
 #' @param date_fin end date of observations to retrieve (optional)
 #'
@@ -18,127 +19,264 @@
 #' 
 #' @export
 #' @examples
-#' donnees<-importe_qualite_hubeau(code_station="04211950", 
+#' 
+#' donnees<-importe_qualite_hubeau(code_station=c("04161595", "04162000", "03174000", "03173000"), 
 #'                                 code_parametre = "1340",
-#'                                 code_support="3")
+#'                                 code_support="3",
+#'                                            date_debut = as.Date("1995-01-01"),
+#'                                        date_fin = as.Date("2019-12-31"))
 #' 
 #' 
 importe_qualite_hubeau <-   function(code_station,
-                                     code_parametre=NULL,
-                                     code_support=NULL,
-                                     code_fraction=NULL,
-           date_debut = NULL,
-           date_fin = NULL) {
-    #astuces pour éviter note no visible binding for global variable
-  .<- NULL
+                                     code_parametre = NULL,
+                                     code_support = NULL,
+                                     code_fraction = NULL,
+                                     date_debut = NULL,
+                                     date_fin = NULL) {
+  #astuces pour éviter note no visible binding for global variable
+  . <- NULL
   
+  # profondeur de resultat max selon API hubeau
+  limite_api_hubeau <- 20000
   
-    if (!is.character(code_station) & !is.factor(code_station)) {
-      stop("importe_qualite_hubeau : code_station must be of class character or factor")
-    }
+  if (!is.character(code_station) & !is.factor(code_station)) {
+    stop("importe_qualite_hubeau : code_station must be of class character or factor")
+  }
   if (!is.null(code_parametre)) {
-      if (!is.character(code_parametre) & !is.factor(code_parametre)) {
-        stop("importe_qualite_hubeau : code_parametre must be of class character or factor")
-      }
-    } 
+    if (!is.character(code_parametre) & !is.factor(code_parametre)) {
+      stop("importe_qualite_hubeau : code_parametre must be of class character or factor")
+    }
+  }
   if (!is.null(code_support)) {
-      if (!is.character(code_support) & !is.factor(code_support)) {
-        stop("importe_qualite_hubeau : code_support must be of class character or factor")
-      }
-    } 
-    if (!is.null(code_fraction)) {
-      if (!is.character(code_fraction) | !is.factor(code_fraction)) {
-        stop("importe_qualite_hubeau : code_fraction must be of class character or factor")
-      }
-    } 
+    if (!is.character(code_support) & !is.factor(code_support)) {
+      stop("importe_qualite_hubeau : code_support must be of class character or factor")
+    }
+  }
+  if (!is.null(code_fraction)) {
+    if (!is.character(code_fraction) & !is.factor(code_fraction)) {
+      stop("importe_qualite_hubeau : code_fraction must be of class character or factor")
+    }
+  }
   
-    if (!is.null(date_debut)) {
-      if (!lubridate::is.Date(date_debut)) {
-        stop("importe_qualite_hubeau : date_debut must be of class Date")
-      }
-    } else {
-      date_debut <- as.Date("1900-01-01")
+  if (!is.null(date_debut)) {
+    if (!lubridate::is.Date(date_debut)) {
+      stop("importe_qualite_hubeau : date_debut must be of class Date")
     }
-
-
-    if (!is.null(date_fin)) {
-      if (!lubridate::is.Date(date_fin)) {
-        stop("importe_qualite_hubeau : date_fin must be of class Date")
-      }
-    } else {
-      date_fin <- as.Date(Sys.Date())
+  } else {
+    date_debut <- as.Date("1900-01-01")
+  }
+  
+  
+  if (!is.null(date_fin)) {
+    if (!lubridate::is.Date(date_fin)) {
+      stop("importe_qualite_hubeau : date_fin must be of class Date")
     }
-
-    url_base <-
-      "https://hubeau.eaufrance.fr/api/v2/qualite_rivieres/analyse_pc?"
-
-    requete<-list(
-      code_station=list(paste0(code_station, collapse = ",")),
-        date_debut_prelevement = date_debut,
-        date_fin_prelevement = date_fin,
-        size = 10000
-      )
-    
-
-    if(!is.null(code_parametre)){requete<-c(requete, code_parametre=list(paste0(code_parametre, collapse = ",")))}
-    if(!is.null(code_support)){requete<-c(requete, code_support=list(paste0(code_support, collapse = ",")))}
-    if(!is.null(code_fraction)){requete<-c(requete, code_fraction=list(paste0(code_fraction, collapse = ",")))}
-    
-    data <- httr::GET(
-      url_base,
-      query = requete
+  } else {
+    date_fin <- as.Date(Sys.Date())
+  }
+  
+  url_base <-
+    "https://hubeau.eaufrance.fr/api/v2/qualite_rivieres/analyse_pc?"
+  
+  ##### On determine le nb de resultat renvoye par la requete #####
+  
+  ss_fct_requet <- function(code_station0,
+                            date_debut0,
+                            date_fin0,
+                            size0,
+                            code_parametre0,
+                            code_support0,
+                            code_fraction0)
+  {
+    requete <- list(
+      code_station = list(paste0(code_station0, collapse = ",")),
+      date_debut_prelevement = date_debut0,
+      date_fin_prelevement = date_fin0,
+      size = size0
     )
-
-
+    
+    
+    if (!is.null(code_parametre0)) {
+      requete <-
+        c(requete, code_parametre = list(paste0(code_parametre0, collapse = ",")))
+    }
+    if (!is.null(code_support0)) {
+      requete <-
+        c(requete, code_support = list(paste0(code_support0, collapse = ",")))
+    }
+    if (!is.null(code_fraction0)) {
+      requete <-
+        c(requete, code_fraction = list(paste0(code_fraction0, collapse = ",")))
+    }
+    
+    data <- httr::GET(url_base,
+                      query = requete)
+    
     httr::warn_for_status(data)
     httr::stop_for_status(data)
-
-    # si la requête renvoie l'ensemble des données en 1 fois
-    if (data$status_code == 200)
+    
+    return(data)
+  }
+  
+  ss_fct_nb_rslt <- function(data00) {
+    nb_result0 <- data00 %>%
+      httr::content(as = 'text', encoding = "UTF-8") %>%
+      jsonlite::fromJSON()
+    
+    return(nb_result0$count)
+  }
+  
+  ss_fct_tab_rslt <- function(data00) {
+   # print(data00$url)
+    if (data00$status_code == 200)
     {
-      data0 <- data %>%
+      data00 <- data00 %>%
         httr::content(as = 'text', encoding = "UTF-8") %>%
         jsonlite::fromJSON() %>%
         .$data
+    } else
+    {
+      stop(
+        paste0(
+          "importe_qualite_hubeau : error in Hubeau API result, status code = ",
+          data00$status_code,
+          " - url = ",
+          data00$url
+        )
+      )
     }
-
-    # si la requête nécessite plusieurs pages de résultats alors on parcours les pages de résultat
-    if (data$status_code == 206)
-    {
-      data0 <- data %>%
-        httr::content(as = 'text', encoding = "UTF-8") %>%
-        jsonlite::fromJSON() %>%
-        .$data
+    return(data00)
+  }
+  
+  
+  #nb de resultat renvoyés par la requête
+  data0 <- ss_fct_requet(
+    code_station0 = code_station,
+    date_debut0 = date_debut,
+    date_fin0 = date_fin,
+    size0 = 10,
+    code_parametre0 = code_parametre,
+    code_support0 = code_support,
+    code_fraction0 = code_fraction
+  )
+  
+  nb_result <- ss_fct_nb_rslt(data0)
+  
+  # traitement différencié si tous les résultats peuvent ou pas être exportés par Hubeau.
+  # Si oui alors on les exporte, si non alors on split la requête pour pouvoir faire plusieurs exports
+  if (nb_result <= limite_api_hubeau)
+  {
+    data0 <- ss_fct_requet(
+      code_station0 = code_station,
+      date_debut0 = date_debut,
+      date_fin0 = date_fin,
+      size0 = limite_api_hubeau,
+      code_parametre0 = code_parametre,
+      code_support0 = code_support,
+      code_fraction0 = code_fraction
+    )
+    
+    
+    data0 <- ss_fct_tab_rslt(data0)
+    
+    
+  } else
+  {
+    ##### Si trop de lignes pour exporter en une fois, on split la requête #####
+    
+    # on decoupe en n intervalles les périodes demandées
+    nb_split <- ceiling(nb_result / limite_api_hubeau)
+    
+    trg_split_en_cours <- TRUE
+    k <- 1
+    
+    while (trg_split_en_cours) {
+      # nb de jours dans chaque intervalle
+      nb_day_interv <- round((date_fin - date_debut) / (k * nb_split))
       
-      url<-"a"
-
-      while (data$status_code == 206 & nchar("url">0))
+      # on decoupe les dates en nb de split
+      dates_a_traiter <- unique(c(seq(date_debut, date_fin, by = nb_day_interv), date_fin))
+      dates_a_traiter <-
+        data.frame(dates_debut = (dates_a_traiter[1:(length(dates_a_traiter) - 1)]+1),
+                   dates_fin = dates_a_traiter[2:length(dates_a_traiter)])
+      dates_a_traiter[1,]$dates_debut<-dates_a_traiter[1,]$dates_debut-1
+      
+      #on compte le nb de resultats de chaque période
+      nb_rst_per <- function(i)
       {
-        # on recupere url page suivante
-        url <- data$headers$link %>% stringr::str_split("<")
-        url <- lapply(url, function(x)
-          stringr::str_split(x, ">"))
-        url <- unlist(url)
-        url <- url[grep("; rel=\"next\"", url) - 1]
-
-        data <- httr::GET(url)
-
-        data1 <- data %>%
-          httr::content(as = 'text', encoding = "UTF-8") %>%
-          jsonlite::fromJSON() %>%
-          .$data
-
-        if (!is.null(nrow(data1)))
-        {
-          data0 <- dplyr::bind_rows(data0, data1)
-        }
+        data0 <- ss_fct_requet(
+          code_station0 = code_station,
+          date_debut0 = dates_a_traiter$dates_debut[i],
+          date_fin0 = dates_a_traiter$dates_fin[i],
+          size0 = 10,
+          code_parametre0 = code_parametre,
+          code_support0 = code_support,
+          code_fraction0 = code_fraction
+        )
+        
+        return(ss_fct_nb_rslt(data0))
       }
-
-
+      
+      dates_a_traiter$nb <-
+        sapply(seq(1, nrow(dates_a_traiter)), nb_rst_per)
+      
+      k <- k + 1
+      if (all(dates_a_traiter$nb < limite_api_hubeau)) {
+        trg_split_en_cours <- FALSE
+      }
+      if (k >= nb_day_interv) {
+        stop(
+          "importe_qualite_hubeau : unable to get all available results, try to restrict input parameters"
+        )
+      }
     }
+    rm(k, trg_split_en_cours, nb_split)
+    
+    # on regroupe des lots à traiter les plus gros possibles
+    l0 <- 1
+    lot <- 1
+    dates_a_traiter$lot <- 0
+    for (k in 1:nrow(dates_a_traiter)) {
+      if (sum(dates_a_traiter$nb[l0:k]) < limite_api_hubeau) {
+        dates_a_traiter$lot[k] <- lot
+      } else
+      {
+        lot <- lot + 1
+        dates_a_traiter$lot[k] <- lot
+        l0 <- k
+      }
+    }
+    rm(l0, lot)
+    dates_a_traiter<-dates_a_traiter[dates_a_traiter$nb!=0,]
+      
+    lots <- unique(dates_a_traiter$lot)
 
-    if (data$status_code == 400){stop("importe_qualite_hubeau : incorrect query")}
-    if (data$status_code == 500){stop("importe_qualite_hubeau : hubeau server internal error")}
-
-    return(data0)
+    ##### On rapatrie les données par lot de date #####
+    data0 <- do.call(dplyr::bind_rows,
+                     lapply(lots,
+                            function(lot0) {
+                              print(paste0("treating batch ", lot0, " on ", length(lots)))
+                              tmp123<-ss_fct_tab_rslt(
+                                ss_fct_requet(
+                                  code_station0 = code_station,
+                                  date_debut0 = min(dates_a_traiter[dates_a_traiter$lot ==
+                                                                      lot0, ]$dates_debut),
+                                  date_fin0 = max(dates_a_traiter[dates_a_traiter$lot ==
+                                                                    lot0, ]$dates_fin),
+                                  size0 = limite_api_hubeau,
+                                  code_parametre0 = code_parametre,
+                                  code_support0 = code_support,
+                                  code_fraction0 = code_fraction
+                                )
+                              )
+                              Sys.sleep(0.3)
+                              return(tmp123)
+                            }))
+    
+  }
+  
+  if(nrow(data0)!=nb_result) {warning(paste0("importe_qualite_hubeau : the fuction return ",
+                                             nrow(data0), " lines whereas hubeau API should return ", nb_result))}
+  
+  return(data0)
 }

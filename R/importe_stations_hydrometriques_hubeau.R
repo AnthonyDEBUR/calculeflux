@@ -39,18 +39,14 @@ tryCatch(emprise0<-sf::st_transform(emprise, crs=4326),
     url_base <-
       "https://hubeau.eaufrance.fr/api/v1/hydrometrie/referentiel/stations?"
 
-    data <- httr::GET(
-      url_base,
-      query = list(
-        bbox = paste0(bbox, collapse = ","),
-        size = 500
-      )
-    )
-
-
+    data <- httr::GET(url_base,
+                      query = list(bbox = paste0(bbox, collapse = ","),
+                                   size = 500))
+    
+    
     httr::warn_for_status(data)
     httr::stop_for_status(data)
-
+    
     # si la requête renvoie l'ensemble des données en 1 fois
     if (data$status_code == 200)
     {
@@ -59,7 +55,7 @@ tryCatch(emprise0<-sf::st_transform(emprise, crs=4326),
         jsonlite::fromJSON() %>%
         .$data
     }
-
+    
     # si la requête nécessite plusieurs pages de résultats alors on parcours les pages de résultat
     if (data$status_code == 206)
     {
@@ -67,10 +63,10 @@ tryCatch(emprise0<-sf::st_transform(emprise, crs=4326),
         httr::content(as = 'text', encoding = "UTF-8") %>%
         jsonlite::fromJSON() %>%
         .$data
-
-      url<-"a"
       
-      while (data$status_code == 206 & nchar("url">0))
+      url <- "a"
+      
+      while (data$status_code == 206 & any(nchar(url) > 0))
       {
         # on recupere url page suivante
         url <- data$headers$link %>% stringr::str_split("<")
@@ -78,17 +74,19 @@ tryCatch(emprise0<-sf::st_transform(emprise, crs=4326),
           stringr::str_split(x, ">"))
         url <- unlist(url)
         url <- url[grep("; rel=\"next\"", url) - 1]
-
-        data <- httr::GET(url)
-
-        data1 <- data %>%
-          httr::content(as = 'text', encoding = "UTF-8") %>%
-          jsonlite::fromJSON() %>%
-          .$data
-
-        if (!is.null(nrow(data1)))
-        {
-          data0 <- dplyr::bind_rows(data0, data1)
+        
+        if (length(url) > 0) {
+          data <- httr::GET(url)
+          
+          data1 <- data %>%
+            httr::content(as = 'text', encoding = "UTF-8") %>%
+            jsonlite::fromJSON() %>%
+            .$data
+          
+          if (!is.null(nrow(data1)))
+          {
+            data0 <- dplyr::bind_rows(data0, data1)
+          }
         }
       }
     }
