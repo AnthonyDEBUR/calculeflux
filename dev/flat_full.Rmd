@@ -21,6 +21,7 @@ If it is the first time you use {fusen}, after 'description', you can directly r
 ```{r development-load}
 # Load already included functions if relevant
 pkgload::load_all(export_all = FALSE)
+
 ```
 
 # Include some data examples in your package
@@ -40,14 +41,30 @@ and `system.file()` to read it in your examples.
 pkgload::load_all(path = here::here(), export_all = FALSE)
 
 # You will be able to read your example data file in each of your function examples and tests as follows - see chunks below
-datafile <- system.file("nyc_squirrels_sample.csv", package = "calculeflux")
-nyc_squirrels <- read.csv(datafile, encoding = "UTF-8")
+datafile <- system.file("nitrates.csv", package = "calculeflux")
+nitrates <- read.csv2(datafile, encoding = "UTF-8")
+nitrates
 
-nyc_squirrels
+analyses<-nitrates
+
+datafile <- system.file("debit.csv", package = "calculeflux")
+debit <- read.csv2(datafile, encoding = "UTF-8")
+debit
+
+datafile <- system.file("donnees_nitrate_semnon.csv", package = "calculeflux")
+nitrates_semnon <- read.csv2(datafile, 
+                             encoding = "UTF-8",
+                             colClasses=c("factor",
+                                          "character",
+                                          "numeric"),
+                             dec=",")
+
+
+
 ```
 
 
-# The first function of the package: Calculate the median of a vector
+# The first function of the package: calcule flux
 
 <!--
 Create a chunk for the core of the function
@@ -63,21 +80,295 @@ After inflating the template
 -  This function code will automatically be added in a new file in the "R/" directory
 -->
 
+
+
+
 ```{r function}
-#' My median
+#' @importFrom utils globalVariables
+utils::globalVariables(c("DatePrel", "jour_mois"))
+
+
+#' calcule_flux
 #'
-#' @param x Vector of Numeric values
-#' @inheritParams stats::median
+#' Calculate flux with one of the methods lists in https://revue-set.fr/article/view/6291
+#' 
+#' M1 : Product of means of sampled Ci and Qi (Preston et al., 1989)
+#' M2 : Mean of instantaneous fluxes : Fi = Ci x Qi (Preston et al., 1989)
+#' M3 : Constant concentration hypothesis around sample (Meybeck et al., 1994)
+#' M4 : Product of means of sampled Ci and annual discharge Q (Shih et al., 1994)
+#' M5 :Flow-weighted mean concentration (Littlewood, 1992)
+#' M6 : Linear interpolation of C (Moatar and Meybeck, 2005)
+#' M9 : Méthode M2 corrigée par un facteur multiplicatif prenant en compte les débits aux instants où l’on n’effectue pas de prélèvements (Cooper, 2004)
+#' 
+#' Dates date_debut_calcul and date_fin_calcul are included in calculus.
+#' if more than one result of analysis or flow rate is available for a same day, then the mean of all non-NA values is used.
+#' 
+#' @param analyses dataframe with the concentrations required for calculus. Concentration in mg/L
+#' @param col_dates_anal Name of the column with date of measurement of concentrations. By default : DatePrel
+#' @param col_analyses Name of the column with values of concentrations. RsAna by default.
+#' @param debit dataframe with daily mean flow rate in L/s
+#' @param col_dates_debit Name of the column with the date of flow rate. Default : date_obs_elab
+#' @param col_debits Name of the column with the flowrate values. Default : resultat_obs_elab
+#' @param methode Code of the method for calculus according https://revue-set.fr/article/view/6291 (default : "M6")
+#' @param date_debut_calcul Date of begining of calculus (for instance "2010-10-01" to start calculus from 1st of october 2010)
+#' @param date_fin_calcul Date of ending of calculus (for instance "2011-09-30" to end calculus to 30 of september 2011)
 #'
 #' @return
-#' Median of vector x
+#' Flux for all the dataset in kg / duration of the measurement (i.e. max(date of flow rate) - min(date of flow rate))
 #' @export
 #'
 #' @examples
-my_median <- function(x, na.rm = TRUE) {
-  if (!is.numeric(x)) {stop("x should be numeric")}
-  stats::median(x, na.rm = na.rm)
+#' @importFrom rlang .data
+
+calcule_flux <- function(analyses, 
+                         col_dates_anal="DatePrel", 
+                         col_analyses="RsAna", 
+                         debit, 
+                         col_dates_debit="date_obs_elab",
+                         col_debits="resultat_obs_elab",
+                         methode="M6",
+                         date_debut_calcul,
+                         date_fin_calcul
+                         ) {
+
+  if (!is.data.frame(analyses)) {
+    stop("analyses should be dataframe")
+  }
+  if (!is.character(col_dates_anal)) {
+    stop("col_dates_anal should be character")
+  }
+  if (!is.character(col_analyses)) {
+    stop("col_analyses should be character")
+  }
+  if (!is.data.frame(debit)) {
+    stop("debit should be dataframe")
+  }
+  if (!is.character(col_dates_debit)) {
+    stop("col_dates_debit should be character")
+  }
+  if (!is.character(col_debits)) {
+    stop("col_debits should be character")
+  }
+  if (!is.character(methode)) {
+    stop("methode should be character")
+  }
+  if (!(col_dates_anal %in% names(analyses))) {
+    stop("col_dates_anal must be one of the column name from data.frame analyses")
+  }
+  if (!(col_analyses %in% names(analyses))) {
+    stop("col_analyses must be one of the column name from data.frame analyses")
+  }
+  if (!(col_dates_debit %in% names(debit))) {
+    stop("col_dates_debit must be one of the column name from data.frame debit")
+  }
+  if (!(col_debits %in% names(debit))) {
+    stop("col_debits must be one of the column name from data.frame debit")
+  }
+  if (!(methode %in% c("M1", "M2", "M3", "M4", "M5", "M6", "M9"))) {
+    stop("methode is not a defined method code")
+  }
+  if (!any(class(analyses[[col_dates_anal]]) %in% c("Date", "POSIXct", "POSIXt", "POSIXlt"))) {
+    stop("Class of analysis dates should be date, POSIXct or POSIXlt")
+  }
+  if (!any(class(debit[[col_dates_debit]]) %in% c("Date", "POSIXct", "POSIXt", "POSIXlt"))) {
+    stop("Class of flow rates dates should be date, POSIXct or POSIXlt")
+  }
+  if (!is.numeric(analyses[[col_analyses]])) {
+    stop("Class of analysis results should be numeric")
+  }
+  if (!class(debit[[col_debits]]) %in% c("numeric")) {
+    stop("Class of analysis results should be numeric")
+  }
+  if (!any(class(date_debut_calcul) %in% c("Date", "POSIXct", "POSIXt", "POSIXlt"))) {
+    stop("Class of date_debut_calcul should be date, POSIXct or POSIXlt")
+  }
+  if (!any(class(date_fin_calcul) %in% c("Date", "POSIXct", "POSIXt", "POSIXlt"))) {
+    stop("Class of date_fin_calcul should be date, POSIXct or POSIXlt")
+  }
+
+  # date_debut_calcul<-'2007-01-01'
+  # date_fin_calcul<-'2007-12-31'
+
+  date_debut_calcul<-date_debut_calcul%>%as.Date()
+  date_fin_calcul<-date_fin_calcul%>%as.Date()
+  
+  if (date_debut_calcul>=date_fin_calcul) {
+    stop("date_debut_calcul must be strictly lower than date_fin_calcul")
+  }
+  
+
+  # on retient la moyenne des résultats d'analyse si plusieurs résultats sont disponibles à la même date
+
+  analyses<-analyses%>%dplyr::group_by(base::get(col_dates_anal))%>%dplyr::summarise(RsAna=mean(.data[[col_analyses]], na.rm=T))
+  names(analyses)<-c("DatePrel", "RsAna")
+  
+  # on retient la moyenne des résultats de debits si plusieurs résultats sont disponibles à la même date
+  debit<-debit%>%dplyr::group_by(get(col_dates_debit))%>%dplyr::summarise(QJM=mean(.data[[col_debits]], na.rm=T))
+  names(debit)<-c("DatePrel", "QJM")
+  
+  # nb de jours de la période consideree
+  nb_jours<-length(seq(from = date_debut_calcul, to = date_fin_calcul, by = 'day'))
+
+  # suppression des donnees non renseignees
+  analyses<-analyses[!is.na(analyses[["RsAna"]]),]
+  analyses[["DatePrel"]]<-as.Date(analyses[["DatePrel"]])
+  debit[["DatePrel"]]<-as.Date(debit[["DatePrel"]])
+  
+  CiQi<-dplyr::inner_join(analyses, debit, by=c("DatePrel")) 
+
+  
+  Flux<-NA
+  
+  if(methode=="M1")
+  {
+    # Product of means of sampled Ci and Qi
+    CiQi<-CiQi%>%subset(DatePrel>=date_debut_calcul & DatePrel<=date_fin_calcul)
+
+    # n = Number of chemical analyses
+    n<-nrow(CiQi)
+    SomCi<-sum(CiQi[["RsAna"]], na.rm=TRUE)
+    SomQi<-sum(CiQi[["QJM"]], na.rm=TRUE)
+
+    Flux<-0.0864*nb_jours*(SomCi/n*SomQi/n)
+
+  }
+
+    if(methode=="M2")
+  {
+    # Mean of instantaneous fluxes Fi = Ci x Qi
+    CiQi<-CiQi%>%subset(DatePrel>=date_debut_calcul & DatePrel<=date_fin_calcul)
+
+    # n = Number of chemical analyses
+    n<-nrow(CiQi)
+    CiQi$CiQi<-CiQi[["RsAna"]]*CiQi[["QJM"]]
+
+    Flux<-0.0864*nb_jours/n*sum(CiQi$CiQi, na.rm=T)
+
+  }
+  
+      if(methode=="M3")
+  {
+    # Constant concentration hypothesis around sample
+
+    analyses0<-analyses%>%subset(DatePrel>=date_debut_calcul & DatePrel<=date_fin_calcul)
+
+    # calculus of each Mean discharge for interval between samples i and i - 1
+    intervalles<-c(as.Date("1900-01-01"), analyses0[["DatePrel"]])%>%unique()%>%sort
+    debit0<-debit%>%subset(DatePrel>=date_debut_calcul & DatePrel<=date_fin_calcul)
+
+    debit0$periode<-NA
+    for(i in 2:length(intervalles))
+    {
+
+        debit0$periode<-ifelse(debit0$DatePrel>intervalles[i-1] &
+                                debit0$DatePrel<=intervalles[i],
+                              i,
+                              debit0$periode)
+
+
+    }
+    debit0$periode<-intervalles[debit0$periode]
+    debit0<-debit0%>%dplyr::group_by(.data$periode)%>%dplyr::summarise(Qmoy=mean(.data$QJM, na.rm=T))
+    CiQii_1<-dplyr::inner_join(analyses0, debit0, by=c("DatePrel"="periode"))
+
+    Kprime<-nb_jours/nrow(CiQii_1)*0.0864
+
+    Flux<-Kprime*sum(CiQii_1$RsAna*CiQii_1$Qmoy, na.rm=TRUE)
+  
+  }
+  
+     if(methode=="M4")
+  {
+    # Product of means of sampled Ci and annual discharge Q
+
+    analyses0<-analyses%>%subset(DatePrel>=date_debut_calcul & DatePrel<=date_fin_calcul)
+    debit0<-debit%>%subset(DatePrel>=date_debut_calcul & DatePrel<=date_fin_calcul)
+
+    # estimation volume annuel ecoule
+    V<-mean(debit0$QJM, na.rm=T)*nb_jours
+    Cmoy<-mean(analyses0$RsAna, na.rm=T)
+
+  Flux<-0.0864*V*Cmoy
+  
+  }
+  
+
+       if(methode=="M5")
+  {
+    # Flow-weighted mean concentration
+
+    analyses0<-analyses%>%subset(DatePrel>=date_debut_calcul & DatePrel<=date_fin_calcul)
+    debit0<-debit%>%subset(DatePrel>=date_debut_calcul & DatePrel<=date_fin_calcul)
+    CiQi0<-CiQi%>%subset(DatePrel>=date_debut_calcul & DatePrel<=date_fin_calcul)
+
+    # estimation volume annuel ecoule
+    V<-mean(debit0$QJM, na.rm=T)*nb_jours
+
+
+  Flux<-0.0864*V*sum(CiQi0$RsAna*CiQi0$QJM)/sum(CiQi0$QJM, na.rm=T)
+
+  }
+  
+
+        if(methode=="M6")
+  {
+    #  Linear interpolation of C
+
+     debit0<-debit%>%subset(DatePrel>=date_debut_calcul & DatePrel<=date_fin_calcul)
+
+    # calculus of concentration variations between 2 mesurements
+     analyses$RsAna_j_1<-c(NA,analyses$RsAna[1:length(analyses$RsAna)-1])
+      analyses$j_1<-c(as.Date("1800-01-01"),analyses$DatePrel[1:length(analyses$DatePrel)-1])
+      analyses$delta_j<-as.numeric(difftime(analyses$DatePrel,analyses$j_1))
+      analyses$gradient_con<-(analyses$RsAna-analyses$RsAna_j_1)/analyses$delta_j
+      
+  
+      # 
+      # CiQi<-CiQi[c("DatePrel", "gradient_con")]
+     
+     
+    resultats_365_j<-data.frame(DatePrel=seq(min(analyses$DatePrel, na.rm=T), max(analyses$DatePrel, na.rm=T), "day"))
+    resultats_365_j<-resultats_365_j%>%dplyr::left_join(debit, by="DatePrel")
+    resultats_365_j<-resultats_365_j%>%dplyr::left_join(analyses, by="DatePrel")
+    #resultats_365_j<-resultats_365_j%>%dplyr::left_join(CiQi, by="DatePrel")
+
+     # filling missing concentrations
+     resultats_365_j$gradient_con<-zoo::na.locf(resultats_365_j$gradient_con, fromLast = TRUE)
+     last_result<-NA
+     for(i in nrow(resultats_365_j):1)
+     {
+       if(is.na(resultats_365_j$RsAna[i])){resultats_365_j$RsAna[i]<-last_result-resultats_365_j$gradient_con[i]}
+        last_result<-resultats_365_j$RsAna[i]
+     }
+
+     # keep only data of considered period
+     resultats_365_j<-resultats_365_j%>%subset(DatePrel>=date_debut_calcul & DatePrel<=date_fin_calcul)
+     resultats_365_j$CiQi<-resultats_365_j$QJM*resultats_365_j$RsAna
+
+     Flux<-0.0864*nb_jours/nrow(resultats_365_j)*sum(resultats_365_j$CiQi, na.rm=T)
+        } 
+  
+
+          if(methode=="M9")
+  {
+      # Mean of instantaneous fluxes Fi = Ci x Qi corrected according Cooper, 2004
+    CiQi<-CiQi%>%subset(DatePrel>=date_debut_calcul & DatePrel<=date_fin_calcul)
+
+    # n = Number of chemical analyses
+    CiQi$CiQi<-CiQi[["RsAna"]]*CiQi[["QJM"]]
+
+    Q_sans_mesure<-debit%>%subset(!(DatePrel%in%analyses$DatePrel) & DatePrel>=date_debut_calcul & DatePrel<=date_fin_calcul)
+    f_correct<-(sum((Q_sans_mesure$QJM)^2, na.rm=TRUE))/(sum((CiQi$QJM)^2, na.rm=TRUE))
+
+    Flux<-0.0864*sum(CiQi$CiQi, na.rm=T)*(1+f_correct)
+        } 
+  
+    
+  return(Flux)
 }
+
+
+
 ```
 
 <!--
@@ -95,13 +386,157 @@ After inflating the template
 -->
 
 ```{r examples}
-my_median(1:12)
 
-# Example with your dataset in "inst/"
-datafile <- system.file("nyc_squirrels_sample.csv", package = "calculeflux")
-nyc_squirrels <- read.csv(datafile, encoding = "UTF-8")
-# Apply my function
-my_median(nyc_squirrels[,"hectare_squirrel_number"])
+date_debut_calcul<-"2007-01-01"%>%as.Date()
+date_fin_calcul<-"2007-12-31"%>%as.Date()
+  
+datafile <- system.file("nitrates.csv", package = "calculeflux")
+nitrates <- read.csv2(datafile, encoding = "UTF-8")
+nitrates$DatePrel<-nitrates$DatePrel%>%as.Date()
+
+datafile <- system.file("debit.csv", package = "calculeflux")
+debit <- read.csv2(datafile, encoding = "UTF-8")
+debit$date_obs_elab<-debit$date_obs_elab%>%as.Date()
+
+calcule_flux(
+  nitrates,
+  col_dates_anal = "DatePrel",
+  col_analyses = "RsAna",
+  debit,
+  methode = "M6",
+  date_debut_calcul=date_debut_calcul,
+  date_fin_calcul=date_fin_calcul
+)
+
+methodes<-c("M1", "M2", "M3", "M4", "M5", "M6", "M9")
+
+tmp<-lapply(methodes,
+function(x){calcule_flux(
+  nitrates,
+  col_dates_anal = "DatePrel",
+  col_analyses = "RsAna",
+  debit,
+  methode = x,
+  date_debut_calcul=date_debut_calcul,
+  date_fin_calcul=date_fin_calcul
+)}
+)
+
+
+tmp<-unlist(tmp)
+tmp<-data.frame(methode=methodes, flux=tmp/1000)
+
+library(ggplot2)
+
+ggplot2::ggplot(tmp, ggplot2::aes(methode, flux)) + 
+  ggplot2::geom_bar(stat="identity") + ggplot2::ylab("Flux en kg NO3/an")
+
+# calcul du flux annuel méthode M6
+
+calcul_flux_annuel<-function(annee)
+{
+  calcule_flux(
+  nitrates,
+  col_dates_anal = "DatePrel",
+  col_analyses = "RsAna",
+  debit,
+  methode = "M6",
+  date_debut_calcul=paste0(annee,"-10-01")%>%as.Date(),
+  date_fin_calcul=paste0((annee+1),"-10-01")%>%as.Date()
+)
+ 
+}
+
+annees<-seq(2002,2021)
+tmp<-lapply(annees, calcul_flux_annuel)
+
+tmp<-unlist(tmp)
+flux_vilaine_bdhydro<-data.frame(annee_hydro=paste0(annees, " - ", annees+1), flux=tmp/1000)
+
+
+ggplot2::ggplot(flux_vilaine_bdhydro, ggplot2::aes(annee_hydro, flux)) +
+  ggplot2::geom_bar(stat="identity") +
+  ggplot2::ylab("flux (t NO3/an)") + 
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, vjust=0.5)) +
+  ggplot2::ggtitle("Flux de nitrates calcul\u00e9s sur la Vilaine \u00e0 Rieux",
+          subtitle="NO3 station 04216000 / station hydrom\u00e9trique J930061101")
+
+
+# calcul du flux bimensuels pour chaque année
+
+
+library(zoo)
+DateSeq_fin_mois <- function(st, en, freq) {
+  st <- as.Date(as.yearmon(st)) 
+  en <- as.Date(as.yearmon(en)) 
+  as.Date(as.yearmon(seq(st, en, by = paste(as.character(12/freq), "months"))), frac = 1)
+
+}
+
+DateSeq_debut_mois <- function(st, en, freq) {
+  st <- as.Date(as.yearmon(st))
+  en <- as.Date(as.yearmon(en)) 
+  as.Date(as.yearmon(seq(st, en, by = paste(as.character(12/freq), "months"))), frac = 0)
+
+}
+
+# # dates de chaque fin de mois
+# DateSeq_fin_mois(as.Date("2002-01-01"),as.Date("2022-09-30"),12)
+
+# dates de debut de mois, un mois sur 2
+dates_debut_mois<-DateSeq_debut_mois(as.Date("2002-10-01"),as.Date("2022-08-01"),6)
+
+# dates des fins de mois 1 mois sur 2
+dates_fin_mois<-DateSeq_fin_mois(as.Date("2002-11-30"),as.Date("2022-09-30"),6)
+
+# mois periode 
+mois_periode<-paste0(format(dates_debut_mois, "%b"),"-",format(dates_fin_mois, "%b"))
+mois_periode<-mois_periode%>%factor(levels=unique(mois_periode))
+
+# annnee hydro
+an_hydro_periode<-ifelse(format(dates_debut_mois, "%m")%>%as.numeric()>=10,
+                         format(dates_debut_mois, "%Y")%>%as.numeric(),
+                         format(dates_debut_mois, "%Y")%>%as.numeric()-1)
+
+an_hydro_periode<-paste0(an_hydro_periode, " - ", an_hydro_periode+1)
+
+periodes<-data.frame(debut=dates_debut_mois,
+                     fin=dates_fin_mois,
+                     mois_periode=mois_periode,
+                     an_hydro_periode=an_hydro_periode)
+
+
+tmp<-lapply(seq(1,nrow(periodes)),
+function(x){
+  calcule_flux(
+  nitrates,
+  col_dates_anal = "DatePrel",
+  col_analyses = "RsAna",
+  debit,
+  methode = "M6",
+  date_debut_calcul=periodes$debut[x],
+  date_fin_calcul=periodes$fin[x]
+)
+  }
+)
+
+
+flux<-unlist(tmp)
+resultats<-cbind(periodes, flux)
+
+
+
+ggplot2::ggplot(resultats, ggplot2::aes(mois_periode, flux)) +
+  ggplot2::geom_bar(stat="identity") +
+  ggplot2::ylab("Flux en kg NO3/an") + 
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, vjust=0.5)) +
+  ggplot2::facet_wrap(an_hydro_periode~.)+
+  ggplot2::ggtitle("Flux de nitrates calcul\u00e9s sur la Vilaine \u00e0 Rieux",
+          subtitle="NO3 station 04216000 / station hydrom\u00e9trique J930061101")
+
+
+
+
 ```
 
 <!--
@@ -118,89 +553,1539 @@ After inflating the template
 -->
 
 ```{r tests}
-test_that("my_median works properly and show error if needed", {
-  expect_true(my_median(1:12) == 6.5)
-  expect_error(my_median("text"))
+
+ date_debut_calcul<-"2007-01-01"%>%as.Date()
+ date_fin_calcul<-"2007-12-31"%>%as.Date()
+  
+datafile <- system.file("nitrates.csv", package = "calculeflux")
+nitrates <- read.csv2(datafile, encoding = "UTF-8")
+nitrates$DatePrel<-nitrates$DatePrel%>%as.Date()
+
+ datafile <- system.file("debit.csv", package = "calculeflux")
+debit <- read.csv2(datafile, encoding = "UTF-8")
+debit$date_obs_elab<-debit$date_obs_elab%>%as.Date()
+
+# test M1
+test<-calcule_flux(
+  nitrates,
+  col_dates_anal = "DatePrel",
+  col_analyses = "RsAna",
+  debit,
+  methode = "M1",
+  date_debut_calcul=date_debut_calcul,
+  date_fin_calcul=date_fin_calcul
+)
+test_that("calcule de flux M1 OK", {
+  expect_equal(test, 99689274)
 })
 
-# Test with your dataset in "inst/"
-datafile <- system.file("nyc_squirrels_sample.csv", package = "calculeflux")
-nyc_squirrels <- read.csv(datafile, encoding = "UTF-8")
-# Apply test on my function
-test_that("my_median works properly with internal dataset", {
-  expect_equal(my_median(nyc_squirrels[,"hectare_squirrel_number"]), 3)
+# test M2
+test<-calcule_flux(
+  nitrates,
+  col_dates_anal = "DatePrel",
+  col_analyses = "RsAna",
+  debit,
+  methode = "M2",
+  date_debut_calcul=date_debut_calcul,
+  date_fin_calcul=date_fin_calcul
+)
+test_that("calcule de flux M2 OK", {
+  expect_equal(test, 112724458)
 })
+
+# test M3
+test<-calcule_flux(
+  nitrates,
+  col_dates_anal = "DatePrel",
+  col_analyses = "RsAna",
+  debit,
+  methode = "M3",
+  date_debut_calcul=date_debut_calcul,
+  date_fin_calcul=date_fin_calcul
+)
+test_that("calcule de flux M3 OK", {
+  expect_equal(test, 128970173)
+})
+
+# test M4
+test<-calcule_flux(
+  nitrates,
+  col_dates_anal = "DatePrel",
+  col_analyses = "RsAna",
+  debit,
+  methode = "M4",
+  date_debut_calcul=date_debut_calcul,
+  date_fin_calcul=date_fin_calcul
+)
+test_that("calcule de flux M4 OK", {
+  expect_equal(test, 77044947)
+})
+
+# test M5
+test<-calcule_flux(
+  nitrates,
+  col_dates_anal = "DatePrel",
+  col_analyses = "RsAna",
+  debit,
+  methode = "M5",
+  date_debut_calcul=date_debut_calcul,
+  date_fin_calcul=date_fin_calcul
+)
+test_that("calcule de flux M5 OK", {
+  expect_equal(test, 87119201)
+})
+
+# test M6
+test<-calcule_flux(
+  nitrates,
+  col_dates_anal = "DatePrel",
+  col_analyses = "RsAna",
+  debit,
+  methode = "M6",
+  date_debut_calcul=date_debut_calcul,
+  date_fin_calcul=date_fin_calcul
+)
+
+test_that("calcule de flux M6 OK", {
+  expect_equal(test, 86453022)
+})
+
+# test M9
+test<-calcule_flux(
+  nitrates,
+  col_dates_anal = "DatePrel",
+  col_analyses = "RsAna",
+  debit,
+  methode = "M9",
+  date_debut_calcul=date_debut_calcul,
+  date_fin_calcul=date_fin_calcul
+)
+
+test_that("calcule de flux M9 OK", {
+  expect_equal(test, 85412992)
+})
+
+
 ```
-
-# Calculate the mean of a vector
 
 <!--
 There can be other functions, examples and tests in your flat template.
 Each of them will be inflated in a different file, provided that there is a level-1 or level-2 section title to separate from previous functions.
 -->
 
-## Use sub-functions in the same chunk
 
-```{r function-my_other_median}
-#' My Other median
-#'
-#' @param x Vector of Numeric values
-#' @inheritParams stats::median
-#'
-#' @return
-#' Median of vector x
+# calcule_hydraulicite
+    
+```{r function-calcule_hydraulicite}
+#' Calculus of hydraulicity
+#' 
+#' Calculus hydraulicity (Ha) for A period (by default : a = an hydrological year)
+#' 
+#' Ha = Qa / Qmean 
+#' Qa = total flow during period A
+#' Qmean = medium flow on period A over years
+#' 
+#' Ha < 1 mean tha the period is dry whereas Ha > 1 mean that period is wet.
+#' 
+#' @param debit dataframe with daily mean flow rate in m3/s
+#' @param col_dates_debit Name of the column with the date of flow rate. Default : date_obs_elab
+#' @param col_debits Name of the column with the flowrate values. Default : resultat_obs_elab
+#' @param date_debut_calcul Date of begining of calculus (for instance "2010-10-01" to start calculus from 1st of october 2010)
+#' @param date_fin_calcul Date of ending of calculus (for instance "2011-09-30" to end calculus to 30 of september 2011)
+#' 
+#' 
+#' @return value of hydraulicity for the period (numeric)
+#' 
 #' @export
-#'
-#' @examples
-my_other_median <- function(x, na.rm = TRUE) {
-  if (!is.numeric(x)) {stop("x should be numeric")}
-  sub_median(x, na.rm =na.rm)
-}
+calcule_hydraulicite <- function(debit,
+                                 col_dates_debit="date_obs_elab",
+                                 col_debits="resultat_obs_elab",
+                                 date_debut_calcul,
+                                 date_fin_calcul){
+    
+  
+    if (!is.data.frame(debit)) {
+    stop("debit should be dataframe")
+  }
+  if (!is.character(col_dates_debit)) {
+    stop("col_dates_debit should be character")
+  }
+  if (!is.character(col_debits)) {
+    stop("col_debits should be character")
+  }
+    if (!(col_dates_debit %in% names(debit))) {
+    stop("col_dates_debit must be one of the column name from data.frame debit")
+  }
+  if (!(col_debits %in% names(debit))) {
+    stop("col_debits must be one of the column name from data.frame debit")
+  }
+  if (!class(debit[[col_dates_debit]]) %in% c("Date", "POSIXct", "POSIXt", "POSIXlt")) {
+    stop("Class of flow rates dates should be date, POSIXct or POSIXlt")
+  }
+  if (!class(debit[[col_debits]]) %in% c("numeric")) {
+    stop("Class of analysis results should be numeric")
+  }
+  if (!class(date_debut_calcul) %in% c("Date", "POSIXct", "POSIXt", "POSIXlt")) {
+    stop("Class of date_debut_calcul should be date, POSIXct or POSIXlt")
+  }
+  if (!class(date_fin_calcul) %in% c("Date", "POSIXct", "POSIXt", "POSIXlt")) {
+    stop("Class of date_fin_calcul should be date, POSIXct or POSIXlt")
+  }
 
-#' Core of the median not exported
-#' @param x Vector of Numeric values
-#' @inheritParams stats::median
-sub_median <- function(x, na.rm = TRUE) {
-  stats::median(x, na.rm)
+   
+  # on retient la moyenne des résultats de debits si plusieurs résultats sont disponibles à la même date
+  debit<-debit%>%dplyr::group_by(get(col_dates_debit))%>%dplyr::summarise(QJM=mean(.data[[col_debits]], na.rm=T))
+  names(debit)<-c("DatePrel", "QJM")
+  
+  # date_debut_calcul<-'2007-12-01'
+  # date_fin_calcul<-'2008-01-31'
+
+  date_debut_calcul<-date_debut_calcul%>%as.Date()
+  date_fin_calcul<-date_fin_calcul%>%as.Date()
+  
+   if (date_debut_calcul>=date_fin_calcul) {
+    stop("date_debut_calcul must be strictly lower than date_fin_calcul")
+   }
+  
+  debit$jour_mois<-paste0("2000",format(debit[["DatePrel"]],"-%m-%d"))%>%as.Date()
+  
+  # si le jour de debut est avant le jour de fin dans une annee civile alors on retient toutes les données entre date de debut et date de fin (ex de janvier à mars)
+  if((format(date_debut_calcul,"%m")%>%as.numeric*100)+(format(date_debut_calcul,"%d")%>%as.numeric)<
+     (format(date_fin_calcul,"%m")%>%as.numeric*100)+(format(date_fin_calcul,"%d")%>%as.numeric))
+  {jour_mois_debut<-paste0("2000",date_debut_calcul%>%format("-%m-%d"))%>%as.Date()
+  jour_mois_fin<-paste0("2000",date_fin_calcul%>%format("-%m-%d"))%>%as.Date()
+  debit<-debit%>%subset(jour_mois>=jour_mois_debut & jour_mois<=jour_mois_fin)
+  }
+  # si c'est l'inverse, on retient les données du mois de fin au mois de début (ex : si date de debut = dec 2020 et date de fin = janvier 2021, on retient totues les données de dec à mars)
+  if(format(date_debut_calcul,"%m")%>%as.numeric*100+format(date_debut_calcul,"%d")%>%as.numeric>
+     format(date_fin_calcul,"%m")%>%as.numeric*100+format(date_fin_calcul,"%d")%>%as.numeric)
+  {jour_mois_debut<-paste0("2000",date_debut_calcul%>%format("-%m-%d"))%>%as.Date()
+  jour_mois_fin<-paste0("2000",date_fin_calcul%>%format("-%m-%d"))%>%as.Date()
+  debit<-debit%>%subset(jour_mois>=jour_mois_debut | jour_mois<=jour_mois_fin)
+  }
+  
+  Qa<-debit%>%subset(DatePrel>=date_debut_calcul & DatePrel<=date_fin_calcul)
+  Qa<-mean(Qa[["QJM"]], na.rm=T)
+  Qmoyen<-mean(debit[["QJM"]], na.rm=T)
+  
+  Ha<-Qa/Qmoyen
+  
+  return(Ha)
 }
 ```
+  
+```{r example-calcule_hydraulicite}
 
-```{r examples-my_other_median}
-my_other_median(1:12)
+date_debut_calcul<-"2022-09-15"%>%as.Date()
+date_fin_calcul<-"2022-09-30"%>%as.Date()
+
+datafile <- system.file("debit.csv", package = "calculeflux")
+debit <- read.csv2(datafile, encoding = "UTF-8")
+debit$date_obs_elab<-debit$date_obs_elab%>%as.Date()
+
+
+calcule_hydraulicite(debit,
+                     col_dates_debit="date_obs_elab",
+                     col_debits="resultat_obs_elab",
+                     date_debut_calcul,
+                     date_fin_calcul)
+
+# example 2
+
+datafile <- system.file("debit.csv", package = "calculeflux")
+debit <- read.csv2(datafile, encoding = "UTF-8")
+debit$date_obs_elab<-debit$date_obs_elab%>%as.Date()
+
+date_debut_calcul=paste0(seq(2002,2021),"-10-01")%>%as.Date
+date_fin_calcul=paste0(seq(2003,2022),"-09-30")%>%as.Date
+
+annees_hydro<-data.frame(date_debut_calcul=date_debut_calcul, 
+                         date_fin_calcul=date_fin_calcul,
+                         nom=paste0(seq(2002,2021),
+                                    "-",
+                                    seq(2003,2022)))
+
+
+
+tmp<-lapply(seq(2002:2021),
+function(x){calcule_hydraulicite(debit,
+                     date_debut_calcul=annees_hydro$date_debut_calcul[x],
+                     date_fin_calcul=annees_hydro$date_fin_calcul[x])
+  }
+)
+
+
+tmp<-unlist(tmp)
+tmp<-data.frame(annee=annees_hydro$nom, hydraulicite=tmp)
+
+
+library(ggplot2)
+
+ggplot2::ggplot(tmp, ggplot2::aes(annee, hydraulicite)) +
+  ggplot2::geom_bar(stat="identity") +
+  ggplot2::ylab("hydraulicite") + 
+  ggplot2::geom_hline(yintercept=1)+
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, vjust=0.5)) +
+  ggplot2::ggtitle("Hydraulicit\u00e9 sur la Vilaine \u00e0 Rieux",
+          subtitle="station hydrom\u00e9trique J930061101")
+
+
+
 ```
+  
+```{r tests-calcule_hydraulicite}
+test_that("calcule_hydraulicite works", {
+  expect_true(inherits(calcule_hydraulicite, "function")) 
+})
 
-```{r tests-my_other_median}
-test_that("my_median works properly and show error if needed", {
-  expect_true(my_other_median(1:12) == 6.5)
-  expect_error(my_other_median("text"))
+
+datafile <- system.file("debit.csv", package = "calculeflux")
+debit <- read.csv2(datafile, encoding = "UTF-8")
+debit$date_obs_elab<-debit$date_obs_elab%>%as.Date()
+
+# test 1
+date_debut_calcul<-"2022-09-15"%>%as.Date()
+date_fin_calcul<-"2022-09-30"%>%as.Date()
+
+test<-calcule_hydraulicite(debit,
+                     col_dates_debit="date_obs_elab",
+                     col_debits="resultat_obs_elab",
+                     date_debut_calcul,
+                     date_fin_calcul)
+
+test_that("calcule hydraulicite 1 OK", {
+  expect_equal(test, 0.7300643)
+})
+
+
+# test 2
+date_debut_calcul<-"2019-12-31"%>%as.Date()
+date_fin_calcul<-"2020-01-01"%>%as.Date()
+
+test<-calcule_hydraulicite(debit,
+                     col_dates_debit="date_obs_elab",
+                     col_debits="resultat_obs_elab",
+                     date_debut_calcul,
+                     date_fin_calcul)
+
+test_that("calcule hydraulicite 2 OK", {
+  expect_equal(test, 1.281062)
+})
+
+
+```
+  
+  
+# importe_debit_dates_dispo
+    
+```{r function-importe_debit_dates_dispo}
+#' Function wich retrn available dates from SIMFEN API
+#' https://geosas.fr/web/?page_id=3804
+#' 
+#' 
+#' @return dataframe with source of flow data and start and end date of data available in the API
+#' 
+#' @export
+importe_debit_dates_dispo <- function(){
+     # récupération des dates de disponibilité des débits depuis le serveur SIMFEN
+    url_wps ="https://wps.geosas.fr/simfenV2/?service=WPS&version=1.0.0&request=Execute&identifier=getInfos"
+    requete = httr::GET(url_wps)
+    httr::content(requete, as = 'parsed')
+    tmp<-httr::content(requete, as = 'parsed')%>%
+      xml2::as_xml_document()%>%
+      xml2::xml_children()%>%
+      xml2::as_list()
+    
+    tmp<-tmp[[3]]$Output$Data$LiteralData[[1]]
+    
+
+# Convert the list to a dataframe
+df <- data.frame(matrix(unlist(strsplit(tmp,",")), ncol = 3, byrow = T), 
+                 stringsAsFactors = F)
+
+# Assign column names to the dataframe
+colnames(df) <- c("name", "start_date", "end_date")
+
+# Convert the date columns to Date type
+conv_date <- function(x) {
+  x <- gsub("Timestamp\\(\\\'", "", x)
+  x <- gsub("\\\'\\)", "", x)
+  x <- as.Date(x, format = " %Y-%m-%d %H:%M:%S")
+}
+
+df$start_date <- conv_date(df$start_date)
+df$end_date <- conv_date(df$end_date)
+ 
+df$name<-gsub("\\[", "",df$name)   
+df$name<-gsub("\\\'", "",df$name)   
+  return(df)
+}
+```
+  
+```{r example-importe_debit_dates_dispo}
+importe_debit_dates_dispo()
+```
+  
+```{r tests-importe_debit_dates_dispo}
+test_that("importe_debit_dates_dispo works", {
+  
+  test<-importe_debit_dates_dispo()
+  expect_true(class(test)=="data.frame")
+  expect_true(nrow(test)>0)
+  
 })
 ```
+    
+  
+  
+  
+  
+  
+# importe_debit
+    
+```{r function-importe_debit}
+#' importe_debit
+#' 
+#' Fonction pour importer des données de débit à partir des API SIMFEN
+#' https://geosas.fr/web/?page_id=3804
+#' La fonction exploite en priorité la base des archives DREAL et en complément celles hubeau
+#' 
+#'@param X : coordonnée du point à partir duquel on souhaite estimer les débits en Lambert 93
+#'@param Y :  coordonnée du point à partir duquel on souhaite estimer les débits en Lambert 93
+#'@param date_debut : date de début de la requête (format date)
+#'@param date_fin : date de fin de la requête (format date)
+#' 
+#' @return dataframe avec 1 colonne date et 1 colonne qjm, qjm étant le débit journalier exprimé en L/s
+#' 
+#' @export
+importe_debit <- function(X, Y, date_debut, date_fin) {
+  if (!("numeric" %in% class(X))) {
+    stop("X doit \u00eatre de type numeric")
+  }
+  if (!("numeric" %in% class(Y))) {
+    stop("Y doit \u00eatre de type numeric")
+  }
+  if (!("Date" %in% class(date_debut))) {
+    stop("date_debut doit \u00eatre de type Date")
+  }
+  if (!("Date" %in% class(date_fin))) {
+    stop("date_fin doit \u00eatre de type Date")
+  }
+  if (date_fin < date_debut) {
+    stop("date_fin doit \u00eatre sup\u00e9rieure ou \u00e9gale \u00e0 date_debut")
+  }
+  
+  
+  # teste si les dates demandées sont disponibles sous geosas
+  dates_dispo <- importe_debit_dates_dispo()
+  
+  #on se limite aux modèles hub_eau et archive_dreal
+   dates_dispo<-dates_dispo[dates_dispo$name%in%c(" hub_eau"," archives_dreal"),]
+  
+  #temporaire car hub_eau est HS sous SIMFEN
+  dates_dispo<-dates_dispo[dates_dispo$name!=(" hub_eau"),]
+  
+  
+  if (date_debut < min(dates_dispo$start_date)) {
+    stop(
+      paste0(
+        "L\'API SIMPFEN n\'est pas disponible pour les dates ant\u00e9rieures \u00e0 ",
+        format(min(dates_dispo$start_date), "%d/%m/%Y")
+      )
+    )
+  }
+  if (date_fin > max(dates_dispo$end_date)) {
+    stop(
+      paste0(
+        "L\'API SIMPFEN n\'est pas disponible pour les dates post\u00e9rieures \u00e0 ",
+        format(max(dates_dispo$end_date), "%d/%m/%Y")
+      )
+    )
+  }
+  
+  # sélection de la base source de données selon les dates demandées
+  sources_data <- data.frame(source = "archives_dreal",
+                             date_debut = date_debut,
+                             date_fin = date_fin)
+  
+  # ordre de priorité : archives_dreal > hub_eau
+  if (date_fin > dates_dispo[dates_dispo$name == " archives_dreal", ]$end_date)
+  {
+    sources_data <- data.frame(
+      source = c("archives_dreal",
+                 "hub_eau"),
+      date_debut = c(date_debut,
+                     dates_dispo[dates_dispo$name == " archives_dreal", ]$end_date +
+                       1),
+      date_fin = c(dates_dispo[dates_dispo$name == " archives_dreal", ]$end_date,
+                   date_fin)
+    )
+  }
+  
+  nb_lignes <- 6000
+  
+  for (k in 1:nrow(sources_data)) {
+    for (i in 0:(as.numeric(sources_data$date_fin[k] - sources_data$date_debut[k]) %/%
+                 nb_lignes))
+    {
+      ifelse(
+        sources_data$date_fin[k] < (sources_data$date_debut[k] + ((i + 1) * nb_lignes)),
+        date_fin_req <- sources_data$date_fin[k],
+        date_fin_req <-
+          sources_data$date_debut[k] + ((i + 1) * nb_lignes)
+      )
+      
+      
+      
+      url_wps = paste0(
+        "https://wps.geosas.fr/simfenV2/?service=WPS&version=1.0.0&request=Execute&identifier=waterFlowSimulation&datainputs=X=",
+        X,
+        ";Y=",
+        Y,
+        ";Start=",
+        (sources_data$date_debut[k] - 1 + i * 6000),
+        ";End=",
+        date_fin_req,
+        ";Project=",
+        sources_data$source[k],
+        ";DeltaT=1440&RawDataOutput=SimulatedFlow"
+      )
+      
+      
+      requete = httr::GET(url_wps)
+      
+      if (requete$status_code != 200) {
+        stop(paste0("erreur dans code :", requete$status_code))
+      }
+      
+      debit = jsonlite::fromJSON(rawToChar(requete$content))
+      colnames(debit) <- c('date', 'qjm')
+      debit = as.data.frame(debit)
+      debit$date = as.Date(debit$date)
+      debit <- debit[2:nrow(debit), ]
+      
+      ifelse(i == 0 &
+               k == 1,
+             debit_out <- debit,
+             debit_out <- rbind(debit_out, debit))
+      
+    }
+  }
+  debit_out <- unique(debit_out)
+  
+  names(debit_out) <- c("date_obs_elab", "resultat_obs_elab")
+  debit_out$resultat_obs_elab <-
+    as.numeric(debit_out$resultat_obs_elab) * 1000
+  return(debit_out)
+}
+```
+  
+```{r example-importe_debit}
+test_debit<-importe_debit(X=381425.6, 
+                          Y=6755598, 
+                          date_debut=as.Date("2010-01-01"), 
+                          date_fin = as.Date("2010-01-17"))
+```
 
-<!--
-# There can be development actions
+```{r example-importe_debit2}
+#CALCUL DU FLUX DE NITRATE SUR LE SEMNON
+datafile <- system.file("donnees_nitrate_semnon.csv", package = "calculeflux")
+nitrates_semnon <- read.csv2(datafile, 
+                             encoding = "UTF-8",
+                             colClasses=c("factor",
+                                          "character",
+                                          "numeric"),
+                             dec=",")
+#date mini et maxi
+nitrates_semnon$DatePrel<-as.POSIXct(nitrates_semnon$DatePrel, format="%d/%m/%Y %H:%M")
+summary(nitrates_semnon$DatePrel)
 
-Create a chunk with 'development' actions
 
-- The chunk needs to be named `development` or `dev`
-- It contains functions that are used for package development only
-- Note that you may want to store most of these functions in the 0-dev_history.Rmd file
+# import des débits sur le Semnon à Eancé
+debit_semnon<-importe_debit(X=381425.6, 
+                          Y=6755598, 
+                          date_debut=as.Date("2010-10-01"), 
+                          date_fin = as.Date("2022-09-30"))
 
-These are only included in the present flat template file, their content will not be part of the package anywhere else.
--->
+
+
+# calcul du flux annuel sur la période
+calcul_flux_annuel<-function(annee)
+{
+  calcule_flux(
+  analyses=nitrates_semnon,
+  col_dates_anal = "DatePrel",
+  col_analyses = "RsAna",
+  debit=debit_semnon,
+  methode = "M6",
+  date_debut_calcul=paste0(annee,"-10-01")%>%as.Date(),
+  date_fin_calcul=paste0((annee+1),"-10-01")%>%as.Date()
+)
+ 
+}
+
+
+
+annees<-seq(2011,2021)
+tmp<-lapply(annees, calcul_flux_annuel)
+tmp<-unlist(tmp)
+rslt_semnon<-data.frame(annee_hydro=paste0(annees, " - ", annees+1), flux=tmp/1000)
+
+
+ggplot2::ggplot(rslt_semnon, ggplot2::aes(annee_hydro, flux)) +
+  ggplot2::geom_bar(stat="identity") +
+  ggplot2::ylab("flux (t NO3/an)") + 
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, vjust=0.5)) +
+  ggplot2::ggtitle("Flux de nitrates calcul\u00e9s sur le Semnon \u00e0 Eanc\u00e9",
+          subtitle="NO3 station 04211950 / d\u00e9bits 
+          estim\u00e9s \u00e0 l\'aide de l\'API SIMFEN / GEOSAS")
+
+
+
+##############################
+
+#CALCUL DU FLUX DE NITRATE SUR LA VILAINE AVEC SIMFEN
+datafile <- system.file("nitrates.csv", package = "calculeflux")
+nitrates <- read.csv2(datafile, encoding = "UTF-8")
+
+
+#date mini et maxi
+nitrates$DatePrel<-nitrates$DatePrel%>%as.Date()
+summary(nitrates$DatePrel)
+
+
+# import des débits sur la Vilaine au niveau de la station hydro
+debit_vilaine<-importe_debit(X=314920, 
+                          Y=6732475, 
+                          date_debut=as.Date("2010-10-01"), 
+                          date_fin = as.Date("2022-09-30"))
+
+
+
+# calcul du flux annuel sur la période
+calcul_flux_annuel<-function(annee)
+{
+  calcule_flux(
+  analyses=nitrates,
+  col_dates_anal = "DatePrel",
+  col_analyses = "RsAna",
+  debit=debit_vilaine,
+  methode = "M6",
+  date_debut_calcul=paste0(annee,"-10-01")%>%as.Date(),
+  date_fin_calcul=paste0((annee+1),"-10-01")%>%as.Date()
+)
+ 
+}
+
+
+
+annees<-seq(2010,2021)
+tmp<-lapply(annees, calcul_flux_annuel)
+
+tmp<-unlist(tmp)
+flux_vilaine_simfen<-data.frame(annee_hydro=paste0(annees, " - ", annees+1), flux=tmp/1000)
+
+
+ggplot2::ggplot(flux_vilaine_simfen, ggplot2::aes(annee_hydro, flux)) +
+  ggplot2::geom_bar(stat="identity") +
+  ggplot2::ylab("flux (t NO3/an)") + 
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, vjust=0.5)) +
+  ggplot2::ggtitle("Flux de nitrates calcul\u00e9s sur la Vilaine \u00e0 Rieux",
+          subtitle="NO3 station 04216000 / d\u00e9bits 
+          estim\u00e9s \u00e0 l\'aide de l\'API SIMFEN / GEOSAS")
+
+
+```
+
+  
+```{r tests-importe_debit}
+
+
+test_that("importe_debit works", {
+  expect_true(inherits(importe_debit, "function")) 
+})
+test<-importe_debit(X=381425.6, 
+                    Y=6755598, 
+                    date_debut=as.Date("2010-01-09"), 
+                    date_fin = as.Date("2010-01-17"))
+
+test_that("import de debit fonctionne", {
+  expect_equal(nrow(test), 9)
+})
+
+
+```
+ 
+# importe_BV_amont
+    
+```{r function-importe_BV_amont}
+#' importe_BV_amont
+#' 
+#' Function to calculate watershed using GEOSAS API MNT Surf
+#' https://geosas.fr/web/?page_id=5877 
+#' 
+#'@param X : coordonnée du point à partir duquel on souhaite estimer les débits en Lambert 93
+#'@param Y :  coordonnée du point à partir duquel on souhaite estimer les débits en Lambert 93
+#' 
+#' @return sf object with watershed
+#' 
+#' @export
+importe_BV_amont <- function(X, Y){
+   if (!("numeric" %in% class(X))) {
+    stop("X doit \u00eatre de type numeric")
+  }
+  if (!("numeric" %in% class(Y))) {
+    stop("Y doit \u00eatre de type numeric")
+  }
+  
+
+       url_wps <- paste0(
+        "https://wps.geosas.fr/mntsurf/?service=wps&request=Execute&identifier=xy2watershed&version=1.0.0&datainputs=X=",
+        X,
+        ";Y=",
+        Y,
+        # ";formatOut=GeoJSON&MNT=France%20250m%20en%20test&rawdataoutput=bvOut"
+            ";formatOut=GeoJSON&Bretagne%2025m&rawdataoutput=bvOut"
+      )
+    
+       requete <- httr::GET(url_wps)
+      
+       if (requete$status_code != 200) {
+        stop(paste0("erreur dans code :", requete$status_code))
+      }
+      
+      bv<-sf::st_read(requete$content%>%rawToChar())
+      
+      return(bv)
+      
+}
+```
+  
+```{r example-importe_BV_amont}
+# Pt en Bretagne
+shp<-importe_BV_amont(X=381425.6,
+                      Y=6755598)
+
+# Pt hors Bretagne
+# shp<-importe_BV_amont(X=336599,
+#                       Y=6674450)
+
+plot(sf::st_geometry(shp))
+
+```
+  
+```{r tests-importe_BV_amont}
+test_that("importe_BV_amont works", {
+  shp<-importe_BV_amont(X=381425.6,
+                      Y=6755598)
+  
+  expect_true("sf"%in%class(shp)) 
+  expect_true(is.numeric(shp$surface_ha))
+  
+})
+```
+   
+# calcule_flux_annuels
+    
+```{r function-calcule_flux_annuels}
+#' calcule_flux_annuels
+#' 
+#' This function calculate ech annual fluxes of a period.
+#' For a same date if their are more than one analysis or flow rate values, then 
+#' calculus is done by considering the mean (excluding NA) of all the values for the day.
+#' 
+#' @param annees : vector with first and last years (in numeric) to treat. If you want results for 
+#' years 2010-2011, 2011-2012 and 2012-2013, annees should be equal to c(2010,2012)
+#' @param mois_debut : numeric indicating wich month to start the hydraulic year 
+#' with. Default is 10 (for october).
+#' @param analyses0 : data.frame with nitrates results for the different dates (mg/L)
+#' @param col_dates_anal : character indicating the name of the column of analyses
+#' in which dates are stored. Default = "DatePrel"
+#' @param col_analyses : character indicating the name of the column of analyses
+#' in which results are stored. Default = "RsAna"
+#' @param debit0 : data.frame with daily flow rates results for the different dates (L/s)
+#' @param col_dates_debit : character indicating the name of the column of debit
+#' in which dates are stored. Default = "date_obs_elab"
+#' @param col_valeurs_debits : character indicating the name of the column of debit
+#' in which results are stored. Default = "resultat_obs_elab"
+#' @param methode : methode used to calculate fluxes. Default = "M6". 
+#' See calcule_flux for more details.
+#' @param out : required output. Values can be : "flux" : only flux are returned,
+#' "hydrau" : only hydraulicity is returned, and "flux_hydrau_pond" : flux, hydraulicity
+#' and ponderaty flux by hydraulicity are returned.
+#' @param minimum_rs_ana : minimum number of data of concentration in one hydraulic 
+#' year to make the calculus. Default = 6 : Calculus are not done for years with 6 
+#' or less data of concentrations
+#' 
+#' 
+#' @return data.frame with columns :
+#' - annee_hydro : hydraulical year
+#' - N_RsAna : number of data of concentration
+#' - N_Qjm : number of daily flow rate
+#' - nb_jours : number of days during the hydraulical year
+#' - debit_an : annual flow rate in m3/year
+#' - flux : flux in kg/year (if analyses in mg/L)
+#' - Cmoy :mean of concentration = flux / debit_tot in mg/L
+#' - hydraulicity : hydraulicity
+#' - flux_pond : flux ponderate by hydraulicity in kg/year (if analyses in mg/L)
+#' 
+#'  
+#' @export
+calcule_flux_annuels <- function(annees, 
+                                 mois_debut=10, 
+                                 analyses0, 
+                                 col_dates_anal="DatePrel",
+                                 col_analyses="RsAna",
+                                 debit0,
+                                 col_dates_debit="date_obs_elab",
+                                 col_valeurs_debits="resultat_obs_elab",
+                                 methode="M6",
+                                 out="flux_hydrau_pond",
+                                 minimum_rs_ana=6){
+  
+  #astuce pour éviter note no visible binding for global variable
+  RsAna <- date_obs_elab <- resultat_obs_elab<- annee_hydro<- NULL
+  
+  if (!"numeric" %in% class(annees)) {
+    stop("calcule_flux_annuels : annees must be a numeric vector")
+  }
+  if (!all(annees %in% seq(1800, 2200))) {
+    stop("calcule_flux_annuels : one or more values of annees are not valid years")
+  }
+  if(length(annees)>2){stop("calcule_flux_annuels : annees should contain only year 
+                            of beginning and year of end of calculation")}
+  if (!"numeric" %in% class(mois_debut)) {
+    stop("calcule_flux_annuels : mois_debut must be a numeric")
+  }
+  if (!all(mois_debut %in% seq(1, 12))) {
+    stop("calcule_flux_annuels : mois_debut is not a valid month")
+  }
+  if (!"data.frame" %in% class(analyses0)) {
+    stop("calcule_flux_annuels : analyses must be a data.frame")
+  }
+  if (!"character" %in% class(col_dates_anal)) {
+    stop("calcule_flux_annuels : col_dates_anal must be a character")
+  }
+  if (!col_dates_anal %in% colnames(analyses0)) {
+    stop(
+      "calcule_flux_annuels : col_dates_anal must be the name of one column of analyses data.frame"
+    )
+  }
+   if (!"character" %in% class(col_analyses)) {
+    stop("calcule_flux_annuels : col_dates_anal must be a character")
+  }
+  if (!col_analyses %in% colnames(analyses0)) {
+    stop(
+      "calcule_flux_annuels : col_analyses must be the name of one column of analyses data.frame"
+    )
+  } 
+  if (!"data.frame" %in% class(debit0)) {
+    stop("calcule_flux_annuels : debit must be a data.frame")
+  }
+  if (!"character" %in% class(col_dates_debit)) {
+    stop("calcule_flux_annuels : col_dates_debit must be a character")
+  }
+  if (!col_dates_debit %in% colnames(debit0)) {
+    stop(
+      "calcule_flux_annuels : col_dates_debit must be the name of one column of debit data.frame"
+    )
+  }
+   if (!"character" %in% class(col_valeurs_debits)) {
+    stop("calcule_flux_annuels : col_valeurs_debits must be a character")
+  }
+  if (!col_valeurs_debits %in% colnames(debit0)) {
+    stop(
+      "calcule_flux_annuels : col_valeurs_debits must be the name of one column of debit data.frame"
+    )
+  } 
+  if (!"character" %in% class(out)) {
+    stop("calcule_flux_annuels : out must be a character")
+  }
+  if (!out %in% c("flux_hydrau_pond", "hydrau", "flux")) {
+    stop(
+      "calcule_flux_annuels : invalidate value for parameter out"
+    )
+  } 
+  
+  debit <- debit0[, c(col_dates_debit, col_valeurs_debits)]
+  names(debit) <- c("date_obs_elab",
+                    "resultat_obs_elab")
+  if (!"Date" %in% class(debit$date_obs_elab)) {
+    stop(
+      paste0(
+        "calcule_flux_annuels : dates from debit data.frame should be of class Date (column ",
+        col_dates_debit,
+        ")"
+      )
+    )
+  }
+  if (!"numeric" %in% class(minimum_rs_ana)) {
+    stop(
+      paste0(
+        "calcule_flux_annuels : minimum_rs_ana should be numeric"
+      )
+    )
+  }
+  if (minimum_rs_ana<0 | (minimum_rs_ana-trunc(minimum_rs_ana))!=0) {
+    stop(
+      paste0(
+        "calcule_flux_annuels : minimum_rs_ana should be a positive integer"
+      )
+    )
+  }
+  
+  analyses<-analyses0[,c(col_dates_anal,col_analyses)]
+  names(analyses)<-c("DatePrel", "RsAna")
+
+ if (!"Date" %in% class(analyses$DatePrel)) {
+    stop(
+      paste0(
+        "calcule_flux_annuels : dates from analyses data.frame should be of class Date (column ",
+        col_dates_anal,
+        ")"
+      )
+    )
+  }
+  if (!"numeric" %in% class(analyses$RsAna)) {
+    stop(
+      paste0(
+        "calcule_flux_annuels : values from analyses data.frame should be of class numeric (column ",
+        col_analyses,
+        ")"
+      )
+    )
+  }
+  if (!"numeric" %in% class(analyses$RsAna)) {
+    stop(
+      paste0(
+        "calcule_flux_annuels : values from analyses data.frame should be of class numeric (column ",
+        col_analyses,
+        ")"
+      )
+    )
+  }
+  
+# on retient la moyenne des résultats d'analyse si plusieurs résultats sont disponibles à la même date
+
+analyses<-analyses%>%
+  dplyr::group_by(DatePrel)%>%
+  dplyr::summarise(RsAna=mean(RsAna, na.rm=T))
+  
+  # on retient la moyenne des résultats de debits si plusieurs résultats sont disponibles à la même date
+debit<-debit%>%
+  dplyr::group_by(date_obs_elab)%>%
+  dplyr::summarise(resultat_obs_elab=mean(resultat_obs_elab, na.rm=T)) 
+  
+  
+# on découpe les données par année hydrologique
+seuils_coupure<-paste(seq(min(annees, na.rm=TRUE), max(annees, na.rm=TRUE)+1, by=1),
+                      mois_debut,"01",
+                      sep="-")%>%as.Date()
+
+
+if(mois_debut==1){lbl_coupure<-seq(min(annees, na.rm=TRUE), max(annees, na.rm=TRUE), by=1)}else
+{lbl_coupure<-paste(seq(min(annees, na.rm=TRUE), max(annees, na.rm=TRUE), by=1),
+                   seq(min(annees, na.rm=TRUE)+1, max(annees, na.rm=TRUE)+1, by=1),
+                   sep="-")}
+
+analyses$annee_hydro<-cut(analyses$DatePrel, breaks=seuils_coupure, labels=lbl_coupure)
+debit$annee_hydro<-cut(debit$date_obs_elab, breaks=seuils_coupure, labels=lbl_coupure)
+
+# calcul du nombre de données de concentration et de debit par annee
+resultat_Q<-debit%>%
+  subset(!is.na(annee_hydro))%>%
+  dplyr::group_by(annee_hydro)%>%
+  dplyr::summarise(N_Qjm=dplyr::n())
+  
+
+Qannuel<-debit%>%
+  subset(!is.na(annee_hydro))%>%
+  dplyr::group_by(annee_hydro)%>%
+  dplyr::summarise(debit_an=sum(resultat_obs_elab, na.rm=TRUE))
+
+resultat_C<-analyses%>%
+  subset(!is.na(annee_hydro))%>%
+  dplyr::group_by(annee_hydro)%>%
+  dplyr::summarise(N_RsAna=dplyr::n())
+
+resultat<-dplyr::full_join(resultat_C, resultat_Q, by="annee_hydro")
+
+nb_jours<-data.frame(annee_hydro=lbl_coupure,
+  nb_jours=difftime(seuils_coupure[2:length(seuils_coupure)],
+                   seuils_coupure[1:length(seuils_coupure)-1],
+                   units="days")%>%as.numeric)
+
+resultat<-dplyr::full_join(resultat, nb_jours, by="annee_hydro")
+resultat<-dplyr::full_join(resultat, Qannuel, by="annee_hydro")
+resultat$debit_an<-resultat$debit_an/resultat$N_Qjm*resultat$nb_jours*24*3600/1000
+
+
+# calcul du flux si demandé
+if(out%in%c("flux", "flux_hydrau_pond"))
+{
+calcul_flux_annuel<-function(i)
+{
+  calcule_flux(
+  analyses,
+  debit,
+  col_dates_anal = "DatePrel",
+  col_analyses = "RsAna",
+  methode = methode,
+  col_dates_debit = "date_obs_elab",
+  col_debits = "resultat_obs_elab",
+  date_debut_calcul=seuils_coupure[i],
+  date_fin_calcul=(seuils_coupure[i]+lubridate::years(1))-1
+)
+}
+
+# periodes à calculer : nb résultat analyses suffisant et existence de aleurs de débit
+a_calculer<-seq(1,length(lbl_coupure))[resultat$N_RsAna>minimum_rs_ana & !is.na(resultat$N_Qjm) &!is.na(resultat$N_RsAna>minimum_rs_ana)]
+
+ resultat$flux<-NA
+ resultat$flux[a_calculer]<-
+   lapply(a_calculer, calcul_flux_annuel)%>%
+                 unlist()
+
+ # suppression des flux calculés les années où il n'y a pas  assez d'analyses
+ try(resultat[resultat$N_RsAna<=minimum_rs_ana,]$flux<-NA, silent=TRUE)
+ 
+ resultat$Cmoy<-resultat$flux/resultat$debit_an*1000
+ 
+}
+
+# calcul de l'hydraulicité si demandé
+if(out%in%c("hydrau", "flux_hydrau_pond"))
+{
+calcul_hydrau_annuel<-function(i)
+{
+  calcule_hydraulicite(
+  debit,
+  col_dates_debit = "date_obs_elab",
+  col_debits = "resultat_obs_elab",
+  date_debut_calcul=seuils_coupure[i],
+  date_fin_calcul=(seuils_coupure[i]+lubridate::years(1))-1
+)
+}
+# periodes à calculer : nb résultat analyses suffisant et existence de aleurs de débit
+a_calculer<-seq(1,length(lbl_coupure))[!is.na(resultat$N_Qjm)]
+
+resultat$hydraulicity<-NA
+
+ resultat$hydraulicity[a_calculer]<-
+   lapply(a_calculer, calcul_hydrau_annuel)%>%
+                 unlist()
+
+}
+
+# calcul du flux pondéré par l'hydraulicité
+if(out%in%c("flux_hydrau_pond"))
+{
+resultat$flux_pond<-resultat$flux/resultat$hydraulicity
+
+}
+    
+
+return(resultat) 
+}
+
+
+```
+  
+```{r example-calcule_flux_annuels}
+   
+
+datafile <- system.file("nitrates.csv", package = "calculeflux")
+nitrates <- read.csv2(datafile, encoding = "UTF-8")
+nitrates$DatePrel<-nitrates$DatePrel%>%as.Date()
+
+
+datafile <- system.file("debit.csv", package = "calculeflux")
+debit <- read.csv2(datafile, encoding = "UTF-8")
+debit$date_obs_elab<-debit$date_obs_elab%>%as.Date()
+
+annees=c(1971,2014)
+ mois_debut<-9
+  
+
+
+flux_vilaine<-calcule_flux_annuels(annees=c(2010,2015),
+                     mois_debut=10,
+                     analyses0=nitrates,
+                     debit0=debit
+                     )
+
+
+
+```
+  
+```{r tests-calcule_flux_annuels}
+test_that("calcule_flux_annuels works", {
+  datafile <- system.file("nitrates.csv", package = "calculeflux")
+nitrates <- read.csv2(datafile, encoding = "UTF-8")
+nitrates$DatePrel<-nitrates$DatePrel%>%as.Date()
+
+
+datafile <- system.file("debit.csv", package = "calculeflux")
+debit <- read.csv2(datafile, encoding = "UTF-8")
+debit$date_obs_elab<-debit$date_obs_elab%>%as.Date()
+
+flux_vilaine<-calcule_flux_annuels(annees=c(2016,2021),
+                     mois_debut=10,
+                     analyses0=nitrates,
+                     debit0=debit
+                     )
+  
+  expect_true(nrow(flux_vilaine)>0) 
+})
+```
+  
+  
+# importe_debit_hubeau
+    
+```{r function-importe_debit_hubeau}
+#' importe_debit_hubeau
+#' 
+#' This function allows for importing available flow data from the Hydrometry 
+#' HUB'EAU API (https://hubeau.eaufrance.fr/page/api-hydrometrie).
+#' 
+#' @param code_entite character or vector with the code of the hydrometric station 
+#' or stations for which we want to retrieve the data (mandatory)
+#' @param date_debut_obs_elab start date of observations to retrieve (optional)
+#' @param date_fin_obs_elab end date of observations to retrieve (optional)
+#'
+#' @return the function returns a tibble with the code of the hydrometric station, 
+#' the date, and the daily average flow in L/s
+#' 
+#' @export
+importe_debit_hubeau <-   function(code_entite,
+           date_debut_obs_elab = NULL,
+           date_fin_obs_elab = NULL) {
+    #astuces pour éviter note no visible binding for global variable
+  .<- NULL
+  
+  
+    if (!is.character(code_entite)) {
+      stop("importe_debit_hubeau : code_entite must be of class character")
+    }
+    if (!is.null(date_debut_obs_elab)) {
+      if (!lubridate::is.Date(date_debut_obs_elab)) {
+        stop("importe_debit_hubeau : date_debut_obs_elab must be of class Date")
+      }
+    } else {
+      date_debut_obs_elab <- as.Date("1900-01-01")
+    }
+
+
+    if (!is.null(date_fin_obs_elab)) {
+      if (!lubridate::is.Date(date_fin_obs_elab)) {
+        stop("importe_debit_hubeau : date_fin_obs_elab must be of class Date")
+      }
+    } else {
+      date_fin_obs_elab <- as.Date(Sys.Date())
+    }
+
+
+
+    url_base <-
+      "https://hubeau.eaufrance.fr/api/v1/hydrometrie/obs_elab?"
+
+    data <- httr::GET(
+      url_base,
+      query = list(
+        code_entite = paste0(code_entite, collapse = ","),
+        date_debut_obs_elab = date_debut_obs_elab,
+        date_fin_obs_elab = date_fin_obs_elab,
+        size = 5000,
+        grandeur_hydro_elab="QmJ",
+        fields = "code_station,date_obs_elab,resultat_obs_elab"
+      )
+    )
+
+
+    httr::warn_for_status(data)
+    httr::stop_for_status(data)
+
+    # si la requête renvoie l'ensemble des données en 1 fois
+    if (data$status_code == 200)
+    {
+      data0 <- data %>%
+        httr::content(as = 'text', encoding = "UTF-8") %>%
+        jsonlite::fromJSON() %>%
+        .$data
+    }
+
+    # si la requête nécessite plusieurs pages de résultats alors on parcours les pages de résultat
+    if (data$status_code == 206)
+    {
+      data0 <- data %>%
+        httr::content(as = 'text', encoding = "UTF-8") %>%
+        jsonlite::fromJSON() %>%
+        .$data
+      
+      url<-"a"
+
+      while (data$status_code == 206 & nchar("url">0))
+      {
+        # on recupere url page suivante
+        url <- data$headers$link %>% stringr::str_split("<")
+        url <- lapply(url, function(x)
+          stringr::str_split(x, ">"))
+        url <- unlist(url)
+        url <- url[grep("; rel=\"next\"", url) - 1]
+
+        data <- httr::GET(url)
+
+        data1 <- data %>%
+          httr::content(as = 'text', encoding = "UTF-8") %>%
+          jsonlite::fromJSON() %>%
+          .$data
+
+        if (!is.null(nrow(data1)))
+        {
+          data0 <- dplyr::bind_rows(data0, data1)
+        }
+      }
+
+
+    }
+
+    if (data$status_code == 400){stop("importe_debit_hubeau : incorrect query")}
+    if (data$status_code == 500){stop("importe_stations_hydrometriques_hubeau : hubeau server internal error")}
+
+    return(data0)
+}
+```
+  
+```{r example-importe_debit_hubeau}
+test<-importe_debit_hubeau(code_entite="J9300611",
+                     date_debut_obs_elab=as.Date("2010-01-01"),
+                     date_fin_obs_elab=as.Date("2012-12-31"))
+```
+  
+```{r tests-importe_debit_hubeau}
+test_that("importe_debit_hubeau works", {
+  
+  test<-importe_debit_hubeau(code_entite="J9300611",
+                     date_debut_obs_elab=as.Date("2010-01-01"),
+                     date_fin_obs_elab=as.Date("2011-12-31"))
+  
+  expect_true(class(test)=="data.frame")
+  expect_true(nrow(test)==729) 
+  expect_true(all(names(test)%in%c("code_station", "date_obs_elab", "resultat_obs_elab")))
+})
+```
+  
+# importe_stations_hydrometriques_hubeau
+    
+```{r function-importe_stations_hydrometriques_hubeau}
+#' importe_stations_hydrometriques_hubeau
+#' This function allows for importing available hydrometric stations from the 
+#' Hydrometry HUB'EAU API (https://hubeau.eaufrance.fr/page/api-hydrometrie).
+#' 
+#' @param emprise object of class sf which define the area of the request
+#'
+#' @return the function returns a sf object with informations about the hydrometric 
+#' station
+#' 
+#' @export
+importe_stations_hydrometriques_hubeau <-   function(emprise) {
+  #astuce pour éviter note no visible binding for global variable
+  .<- NULL
+ 
+    if (!"sf"%in%class(emprise)) {
+      stop("importe_stations_hydrometriques_hubeau : emprise must be an object of class sf")
+    }
+
+  
+tryCatch(emprise0<-sf::st_transform(emprise, crs=4326),
+  error = function(e) {
+    # code to handle the error
+    message(
+      "importe_stations_hydrometriques_hubeau : Error in converting the projection 
+      of 'emprise'. Verify that the input file's st_crs is properly filled in."
+    )
+  })
+
+  bbox<-sf::st_bbox(emprise0)
+  
+    url_base <-
+      "https://hubeau.eaufrance.fr/api/v1/hydrometrie/referentiel/stations?"
+
+    data <- httr::GET(
+      url_base,
+      query = list(
+        bbox = paste0(bbox, collapse = ","),
+        size = 500
+      )
+    )
+
+
+    httr::warn_for_status(data)
+    httr::stop_for_status(data)
+
+    # si la requête renvoie l'ensemble des données en 1 fois
+    if (data$status_code == 200)
+    {
+      data0 <- data %>%
+        httr::content(as = 'text', encoding = "UTF-8") %>%
+        jsonlite::fromJSON() %>%
+        .$data
+    }
+
+    # si la requête nécessite plusieurs pages de résultats alors on parcours les pages de résultat
+    if (data$status_code == 206)
+    {
+      data0 <- data %>%
+        httr::content(as = 'text', encoding = "UTF-8") %>%
+        jsonlite::fromJSON() %>%
+        .$data
+
+      url<-"a"
+      
+      while (data$status_code == 206 & nchar("url">0))
+      {
+        # on recupere url page suivante
+        url <- data$headers$link %>% stringr::str_split("<")
+        url <- lapply(url, function(x)
+          stringr::str_split(x, ">"))
+        url <- unlist(url)
+        url <- url[grep("; rel=\"next\"", url) - 1]
+
+        data <- httr::GET(url)
+
+        data1 <- data %>%
+          httr::content(as = 'text', encoding = "UTF-8") %>%
+          jsonlite::fromJSON() %>%
+          .$data
+
+        if (!is.null(nrow(data1)))
+        {
+          data0 <- dplyr::bind_rows(data0, data1)
+        }
+      }
+    }
+
+    if (data$status_code == 400){stop("importe_stations_hydrometriques_hubeau : incorrect query")}
+    if (data$status_code == 500){stop("importe_stations_hydrometriques_hubeau : hubeau server internal error")}
+    
+    data0<-sf::st_as_sf(data0, 
+                        coords=c("longitude_station", "latitude_station"),
+                        crs=4326)
+
+    data0<-sf::st_transform(data0, sf::st_crs(emprise))
+    data0<-data0[emprise,]
+    
+    return(data0)
+}
+```
+  
+```{r example-importe_stations_hydrometriques_hubeau}
+utils::data(sage_vilaine, package="calculeflux")
+  test<-importe_stations_hydrometriques_hubeau(emprise=sage_vilaine)
+
+  plot(sage_vilaine)
+  plot(test, add=TRUE)
+```
+  
+```{r tests-importe_stations_hydrometriques_hubeau}
+test_that("importe_stations_hydrometriques_hubeau works", {
+  utils::data(sage_vilaine, package="calculeflux")
+  test<-importe_stations_hydrometriques_hubeau(emprise=sage_vilaine)
+  expect_true(nrow(test)>100) 
+})
+```
+  
+  
+# importe_qualite_hubeau
+    
+```{r function-importe_qualite_hubeau}
+#' importe_qualite_hubeau
+#' 
+#' This function allows for importing available flow data from the Hydrometry 
+#' HUB'EAU API (https://hubeau.eaufrance.fr/page/api-hydrometrie).
+#' 
+#' All codes comes from https://www.sandre.eaufrance.fr/Rechercher-un-jeu-de-donnees.
+#' 
+#' @param code_station character or vector with the code of the measurement(s) station(s) 
+#' @param code_parametre character or vector with the code of required parameter (optional)
+#' 
+#' @param date_debut start date of observations to retrieve (optional)
+#' @param date_fin end date of observations to retrieve (optional)
+#'
+#' @return the function returns a tibble with the code of the measurement station, 
+#' the date, the results, ...
+#' 
+#' @export
+importe_qualite_hubeau <-   function(code_station,
+                                     code_parametre=NULL,
+                                     code_support=NULL,
+                                     code_fraction=NULL,
+           date_debut = NULL,
+           date_fin = NULL) {
+    #astuces pour éviter note no visible binding for global variable
+  .<- NULL
+  
+  
+    if (!is.character(code_station) & !is.factor(code_station)) {
+      stop("importe_qualite_hubeau : code_station must be of class character or factor")
+    }
+  if (!is.null(code_parametre)) {
+      if (!is.character(code_parametre) & !is.factor(code_parametre)) {
+        stop("importe_qualite_hubeau : code_parametre must be of class character or factor")
+      }
+    } 
+  if (!is.null(code_support)) {
+      if (!is.character(code_support) & !is.factor(code_support)) {
+        stop("importe_qualite_hubeau : code_support must be of class character or factor")
+      }
+    } 
+    if (!is.null(code_fraction)) {
+      if (!is.character(code_fraction) | !is.factor(code_fraction)) {
+        stop("importe_qualite_hubeau : code_fraction must be of class character or factor")
+      }
+    } 
+  
+    if (!is.null(date_debut)) {
+      if (!lubridate::is.Date(date_debut)) {
+        stop("importe_qualite_hubeau : date_debut must be of class Date")
+      }
+    } else {
+      date_debut <- as.Date("1900-01-01")
+    }
+
+
+    if (!is.null(date_fin)) {
+      if (!lubridate::is.Date(date_fin)) {
+        stop("importe_qualite_hubeau : date_fin must be of class Date")
+      }
+    } else {
+      date_fin <- as.Date(Sys.Date())
+    }
+
+    url_base <-
+      "https://hubeau.eaufrance.fr/api/v2/qualite_rivieres/analyse_pc?"
+
+    requete<-list(
+      code_station=list(paste0(code_station, collapse = ",")),
+        date_debut_prelevement = date_debut,
+        date_fin_prelevement = date_fin,
+        size = 10000
+      )
+    
+
+    if(!is.null(code_parametre)){requete<-c(requete, code_parametre=list(paste0(code_parametre, collapse = ",")))}
+    if(!is.null(code_support)){requete<-c(requete, code_support=list(paste0(code_support, collapse = ",")))}
+    if(!is.null(code_fraction)){requete<-c(requete, code_fraction=list(paste0(code_fraction, collapse = ",")))}
+    
+    data <- httr::GET(
+      url_base,
+      query = requete
+    )
+
+
+    httr::warn_for_status(data)
+    httr::stop_for_status(data)
+
+    # si la requête renvoie l'ensemble des données en 1 fois
+    if (data$status_code == 200)
+    {
+      data0 <- data %>%
+        httr::content(as = 'text', encoding = "UTF-8") %>%
+        jsonlite::fromJSON() %>%
+        .$data
+    }
+
+    # si la requête nécessite plusieurs pages de résultats alors on parcours les pages de résultat
+    if (data$status_code == 206)
+    {
+      data0 <- data %>%
+        httr::content(as = 'text', encoding = "UTF-8") %>%
+        jsonlite::fromJSON() %>%
+        .$data
+      
+      url<-"a"
+
+      while (data$status_code == 206 & nchar("url">0))
+      {
+        # on recupere url page suivante
+        url <- data$headers$link %>% stringr::str_split("<")
+        url <- lapply(url, function(x)
+          stringr::str_split(x, ">"))
+        url <- unlist(url)
+        url <- url[grep("; rel=\"next\"", url) - 1]
+
+        data <- httr::GET(url)
+
+        data1 <- data %>%
+          httr::content(as = 'text', encoding = "UTF-8") %>%
+          jsonlite::fromJSON() %>%
+          .$data
+
+        if (!is.null(nrow(data1)))
+        {
+          data0 <- dplyr::bind_rows(data0, data1)
+        }
+      }
+
+
+    }
+
+    if (data$status_code == 400){stop("importe_qualite_hubeau : incorrect query")}
+    if (data$status_code == 500){stop("importe_qualite_hubeau : hubeau server internal error")}
+
+    return(data0)
+}
+```
+  
+```{r example-importe_qualite_hubeau}
+donnees<-importe_qualite_hubeau(code_station="04211950", 
+                                code_parametre = "1340",
+                                code_support="3")
+
+
+```
+  
+```{r tests-importe_qualite_hubeau}
+test_that("importe_qualite_hubeau works", {
+  donnees<-importe_qualite_hubeau(code_station="04211950", 
+                                code_parametre = "1340",
+                                code_support="3")
+  expect_true(class(donnees)=="data.frame")
+  expect_true(nrow(donnees)>138)
+})
+```
+    
+  
+  
+# sage_vilaine
+    
+```{r function-sage_vilaine}
+#' sage_vilaine
+#'
+#' data in 'datasets'.
+#'
+#' @format A sf object with 1 row and 2 variables
+#' \describe{
+#'   \item{ nom }{  character }
+#'   \item{ geom }{  sfc_MULTIPOLYGON }
+#' }
+#' @source https://sandre.eaufrance.fr/atlas/srv/fre/catalog.search#/metadata/2faf7c9e-ad62-4137-b80b-8b0caa3609cb
+"sage_vilaine" 
+```
+  
+
+```{r tests-sage_vilaine}
+test_that("sage_vilaine works", {
+  expect_true(nrow(sage_vilaine)==1) 
+})
+```
+  
+
 
 ```{r development-inflate, eval=FALSE}
 # Keep eval=FALSE to avoid infinite loop in case you hit the knit button
 # Execute in the console directly
-fusen::inflate(flat_file = "dev/flat_full.Rmd", vignette_name = "Get started")
+fusen::inflate(flat_file = "dev/flat_full.Rmd", vignette_name = "Get started", overwrite="yes")
 ```
 
 
-# Inflate your package
-
-You're one inflate from paper to box.
-Build your package from this very Rmd using `fusen::inflate()`
-
-- Verify your `"DESCRIPTION"` file has been updated
-- Verify your function is in `"R/"` directory
-- Verify your test is in `"tests/testthat/"` directory
-- Verify this Rmd appears in `"vignettes/"` directory
