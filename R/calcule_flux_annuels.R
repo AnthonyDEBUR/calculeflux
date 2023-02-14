@@ -255,7 +255,7 @@ nb_jours<-data.frame(annee_hydro=lbl_coupure,
 resultat<-dplyr::full_join(resultat, nb_jours, by="annee_hydro")
 resultat<-dplyr::full_join(resultat, Qannuel, by="annee_hydro")
 resultat$debit_an<-resultat$debit_an/resultat$N_Qjm*resultat$nb_jours*24*3600/1000
-
+resultat<-resultat%>%dplyr::arrange(annee_hydro)
 
 # calcul du flux si demandé
 if(out%in%c("flux", "flux_hydrau_pond"))
