@@ -170,7 +170,7 @@ importe_qualite_hubeau <-   function(code_station=NULL,
   
   # traitement différencié si tous les résultats peuvent ou pas être exportés par Hubeau.
   # Si oui alors on les exporte, si non alors on split la requête pour pouvoir faire plusieurs exports
-  if (nb_result <= limite_api_hubeau)
+  if (nb_result <= limite_api_hubeau & nb_result>0)
   {
     data0 <- ss_fct_requet(
       code_station0 = code_station,
@@ -186,7 +186,8 @@ importe_qualite_hubeau <-   function(code_station=NULL,
     data0 <- ss_fct_tab_rslt(data0)
     
     
-  } else
+    
+  } else if (nb_result>0)
   {
     ##### Si trop de lignes pour exporter en une fois, on split la requête #####
     
@@ -279,7 +280,7 @@ importe_qualite_hubeau <-   function(code_station=NULL,
                               return(tmp123)
                             }))
     
-  }
+  } else {data0<-data.frame()}
   
   if(nrow(data0)!=nb_result) {warning(paste0("importe_qualite_hubeau : the fuction return ",
                                              nrow(data0), " lines whereas hubeau API should return ", nb_result))}
