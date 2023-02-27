@@ -27,7 +27,7 @@
 #'                                        date_fin = as.Date("2019-12-31"))
 #' 
 #' 
-importe_qualite_hubeau <-   function(code_station,
+importe_qualite_hubeau <-   function(code_station=NULL,
                                      code_parametre = NULL,
                                      code_support = NULL,
                                      code_fraction = NULL,
@@ -39,9 +39,13 @@ importe_qualite_hubeau <-   function(code_station,
   # profondeur de resultat max selon API hubeau
   limite_api_hubeau <- 20000
   
+  if(is.null(code_station) & is.null(code_parametre) & (is.null(date_debut) | is.null(date_fin))){
+    stop("importe_qualite_hubeau : code_station, code_parametre & (date_debut or date_fin) can't be NULL together")
+  }
+  if(!is.null(code_station)){
   if (!is.character(code_station) & !is.factor(code_station)) {
     stop("importe_qualite_hubeau : code_station must be of class character or factor")
-  }
+  }}
   if (!is.null(code_parametre)) {
     if (!is.character(code_parametre) & !is.factor(code_parametre)) {
       stop("importe_qualite_hubeau : code_parametre must be of class character or factor")
@@ -89,13 +93,15 @@ importe_qualite_hubeau <-   function(code_station,
                             code_fraction0)
   {
     requete <- list(
-      code_station = list(paste0(code_station0, collapse = ",")),
       date_debut_prelevement = date_debut0,
       date_fin_prelevement = date_fin0,
       size = size0
     )
     
-    
+      if (!is.null(code_station0)) {
+      requete <-
+        c(requete, code_station = list(paste0(code_station0, collapse = ",")))
+    }
     if (!is.null(code_parametre0)) {
       requete <-
         c(requete, code_parametre = list(paste0(code_parametre0, collapse = ",")))

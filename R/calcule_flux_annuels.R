@@ -275,7 +275,7 @@ calcul_flux_annuel<-function(i)
 )
 }
 
-# periodes à calculer : nb résultat analyses suffisant et existence de aleurs de débit
+# periodes à calculer : nb résultat analyses suffisant et existence de valeurs de débit
 a_calculer<-seq(1,length(lbl_coupure))[resultat$N_RsAna>minimum_rs_ana & !is.na(resultat$N_Qjm) &!is.na(resultat$N_RsAna>minimum_rs_ana)]
 
  resultat$flux<-NA
