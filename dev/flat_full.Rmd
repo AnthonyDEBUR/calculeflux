@@ -2264,28 +2264,84 @@ test_that("sage_vilaine works", {
 ```
   
 # importe_debit_siva
-    
+
+Il faut télécharger le package SIVA
+`r devtools::install_github("https://github.com/Eaux-et-Vilaine/SIVA")`
+        
 ```{r function-importe_debit_siva}
-#' Title
+#' Imports flow from the SIVA package
 #' 
-#' Description
-#' 
-#' @return
+#' This function will load data from the Arzal dam
+#' @inheritParams SIVA::load_debit_barrage
+#' @inherit SIVA::load_debit_barrage
+#' @return A data frame
 #' 
 #' @export
-importe_debit_siva <- function(){
-    
+importe_debit_siva <- function(debut,
+     fin,
+     con){
+ 
+ dat <- SIVA::load_debit_barrage(debut=debut,
+     fin=fin,
+     con=pool)
+ return(dat)
 }
 ```
   
 ```{r example-importe_debit_siva}
-importe_debit_siva()
+# Ask anthony or Cédric for the credential file
+ tryCatch({
+  cred <- yaml::read_yaml("credentials.yml")
+  }, error= function(e){"You need to have the credentials to connect to SIVA"})
+  
+  hostmysql. <- cred$hostmysql
+  pwdmysql. <- cred$pwdmysql
+  umysql. <- cred$usermysql
+ 
+ pool <- pool::dbPool(
+     drv = RMariaDB::MariaDB(),
+     dbname = "archive_IAV",
+     host = hostmysql.,
+     username = umysql.,
+     password = pwdmysql.,
+     port=3306
+ )
+importe_debit_siva(debut="2020-01-01 00:00:00",
+     fin="2020-01-20 00:00:00",
+     con=pool)
 ```
   
 ```{r tests-importe_debit_siva}
-test_that("importe_debit_siva works", {
-  expect_true(inherits(importe_debit_siva, "function")) 
-})
+test_that("importe_debit_siva works",
+          {
+            skip_if_not(interactive())
+            tryCatch({
+              cred <- yaml::read_yaml("credentials.yml")
+            }, error = function(e) {
+              "You need to have the credentials to connect to SIVA"
+            })
+            
+            hostmysql. <- cred$hostmysql
+            pwdmysql. <- cred$pwdmysql
+            umysql. <- cred$usermysql
+            
+            pool <- pool::dbPool(
+              drv = RMariaDB::MariaDB(),
+              dbname = "archive_IAV",
+              host = hostmysql.,
+              username = umysql.,
+              password = pwdmysql.,
+              port = 3306
+            )
+            system.time(
+            debit_barrage <- importe_debit_siva(
+                debut = as.POSIXct(strptime("2017-01-01 00:00:00", format = "%Y-%m-%d %H:%M:%S")),
+                fin = as.POSIXct(strptime("2017-01-10 00:00:00", format = "%Y-%m-%d %H:%M:%S")),
+                con = pool
+              )
+            )# 23 s maison
+            expect_is(debit_barrage, "data.frame")
+          })
 ```
   
 
