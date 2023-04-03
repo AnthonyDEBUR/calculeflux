@@ -1,3 +1,6 @@
 
 ^dev$
 ^LICENSE\.md$
+^.*\.Rproj$
+^\.Rproj\.user$
+^calculeflux\.Rproj$
