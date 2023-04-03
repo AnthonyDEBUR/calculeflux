@@ -2263,7 +2263,31 @@ test_that("sage_vilaine works", {
 })
 ```
   
-
+# importe_debit_siva
+    
+```{r function-importe_debit_siva}
+#' Title
+#' 
+#' Description
+#' 
+#' @return
+#' 
+#' @export
+importe_debit_siva <- function(){
+    
+}
+```
+  
+```{r example-importe_debit_siva}
+importe_debit_siva()
+```
+  
+```{r tests-importe_debit_siva}
+test_that("importe_debit_siva works", {
+  expect_true(inherits(importe_debit_siva, "function")) 
+})
+```
+  
 
 ```{r development-inflate, eval=FALSE}
 # Keep eval=FALSE to avoid infinite loop in case you hit the knit button
