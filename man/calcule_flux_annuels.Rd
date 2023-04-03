@@ -15,7 +15,8 @@ calcule_flux_annuels(
   col_valeurs_debits = "resultat_obs_elab",
   methode = "M6",
   out = "flux_hydrau_pond",
-  minimum_rs_ana = 6
+  minimum_rs_ana = 6,
+  minimum_winter_rs = 4
 )
 }
 \arguments{
@@ -49,8 +50,12 @@ See calcule_flux for more details.}
 and ponderaty flux by hydraulicity are returned.}
 
 \item{minimum_rs_ana}{: minimum number of data of concentration in one hydraulic
-year to make the calculus. Default = 6 : Calculus are not done for years with 6
-or less data of concentrations}
+year to make the calculus. Default = 6 : Calculus are not done for years with
+strictly less than 6 data of concentrations}
+
+\item{minimum_winter_rs}{: minimum number of data of concentration in one hydraulic
+year during winter period (october to april) to make the calculus. Default = 4 :
+Calculus are not done for years with strictly less than 4 data of concentrations}
 }
 \value{
 data.frame with columns :
@@ -84,14 +89,14 @@ debit <- read.csv2(datafile, encoding = "UTF-8")
 debit$date_obs_elab<-debit$date_obs_elab\%>\%as.Date()
 
 annees=c(1971,2014)
- mois_debut<-9
-  
-
+ 
 
 flux_vilaine<-calcule_flux_annuels(annees=c(2010,2015),
                      mois_debut=10,
                      analyses0=nitrates,
-                     debit0=debit
+                     debit0=debit,
+                     minimum_rs_ana = 9,
+                      minimum_winter_rs = 4
                      )
 
 

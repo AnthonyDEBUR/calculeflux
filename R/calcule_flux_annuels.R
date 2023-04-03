@@ -26,8 +26,11 @@
 #' "hydrau" : only hydraulicity is returned, and "flux_hydrau_pond" : flux, hydraulicity
 #' and ponderaty flux by hydraulicity are returned.
 #' @param minimum_rs_ana : minimum number of data of concentration in one hydraulic 
-#' year to make the calculus. Default = 6 : Calculus are not done for years with 6 
-#' or less data of concentrations
+#' year to make the calculus. Default = 6 : Calculus are not done for years with  
+#' strictly less than 6 data of concentrations
+#' @param minimum_winter_rs : minimum number of data of concentration in one hydraulic 
+#' year during winter period (october to april) to make the calculus. Default = 4 : 
+#' Calculus are not done for years with strictly less than 4 data of concentrations
 #' 
 #' 
 #' @return data.frame with columns :
@@ -56,14 +59,14 @@
 #' debit$date_obs_elab<-debit$date_obs_elab%>%as.Date()
 #' 
 #' annees=c(1971,2014)
-#'  mois_debut<-9
-#'   
-#' 
+#'  
 #' 
 #' flux_vilaine<-calcule_flux_annuels(annees=c(2010,2015),
 #'                      mois_debut=10,
 #'                      analyses0=nitrates,
-#'                      debit0=debit
+#'                      debit0=debit,
+#'                      minimum_rs_ana = 9,
+#'                       minimum_winter_rs = 4
 #'                      )
 #' 
 #' 
@@ -78,7 +81,8 @@ calcule_flux_annuels <- function(annees,
                                  col_valeurs_debits="resultat_obs_elab",
                                  methode="M6",
                                  out="flux_hydrau_pond",
-                                 minimum_rs_ana=6){
+                                 minimum_rs_ana=6,
+                                 minimum_winter_rs=4){
   
   #astuce pour éviter note no visible binding for global variable
   RsAna <- date_obs_elab <- resultat_obs_elab<- annee_hydro<- NULL
@@ -171,6 +175,22 @@ calcule_flux_annuels <- function(annees,
     )
   }
   
+  
+    if (!"numeric" %in% class(minimum_winter_rs)) {
+    stop(
+      paste0(
+        "calcule_flux_annuels : minimum_winter_rs should be numeric"
+      )
+    )
+  }
+  if (minimum_winter_rs<0 | (minimum_winter_rs-trunc(minimum_winter_rs))!=0) {
+    stop(
+      paste0(
+        "calcule_flux_annuels : minimum_winter_rs should be a positive integer"
+      )
+    )
+  }
+  
   analyses<-analyses0[,c(col_dates_anal,col_analyses)]
   names(analyses)<-c("DatePrel", "RsAna")
 
@@ -226,6 +246,7 @@ if(mois_debut==1){lbl_coupure<-seq(min(annees, na.rm=TRUE), max(annees, na.rm=TR
                    sep="-")}
 
 analyses$annee_hydro<-cut(analyses$DatePrel, breaks=seuils_coupure, labels=lbl_coupure)
+analyses$mois<-format(analyses$DatePrel, "%m")
 debit$annee_hydro<-cut(debit$date_obs_elab, breaks=seuils_coupure, labels=lbl_coupure)
 
 # calcul du nombre de données de concentration et de debit par annee
@@ -245,7 +266,14 @@ resultat_C<-analyses%>%
   dplyr::group_by(annee_hydro)%>%
   dplyr::summarise(N_RsAna=dplyr::n())
 
+resultat_C_winter<-analyses%>%
+  subset(!is.na(annee_hydro))%>%
+  subset(mois%in%c("10","11","12","01","02","03","04"))%>%
+  dplyr::group_by(annee_hydro)%>%
+  dplyr::summarise(N_RsAna_winter=dplyr::n())
+
 resultat<-dplyr::full_join(resultat_C, resultat_Q, by="annee_hydro")
+resultat<-dplyr::full_join(resultat, resultat_C_winter, by="annee_hydro")
 
 nb_jours<-data.frame(annee_hydro=lbl_coupure,
   nb_jours=difftime(seuils_coupure[2:length(seuils_coupure)],
@@ -276,7 +304,9 @@ calcul_flux_annuel<-function(i)
 }
 
 # periodes à calculer : nb résultat analyses suffisant et existence de valeurs de débit
-a_calculer<-seq(1,length(lbl_coupure))[resultat$N_RsAna>minimum_rs_ana & !is.na(resultat$N_Qjm) &!is.na(resultat$N_RsAna>minimum_rs_ana)]
+a_calculer<-seq(1,length(lbl_coupure))[resultat$N_RsAna>=minimum_rs_ana & !is.na(resultat$N_Qjm) &!is.na(resultat$N_RsAna>=minimum_rs_ana) & 
+                                         resultat$N_RsAna_winter>=minimum_winter_rs &
+                                         !is.na(resultat$N_RsAna_winter>=minimum_winter_rs)]
 
  resultat$flux<-NA
  resultat$flux[a_calculer]<-
