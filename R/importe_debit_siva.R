@@ -36,5 +36,6 @@ importe_debit_siva <- function(debut,
  dat <- SIVA::load_debit_barrage(debut=debut,
      fin=fin,
      con=pool)
- return(dat)
+ dj <- SIVA::debit_journalier(dat, type="recalcule")
+ return(dj)
 }
