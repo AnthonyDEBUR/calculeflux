@@ -27,8 +27,11 @@ Imports:
 Suggests: 
     ggplot2,
     knitr,
+    pool,
+    RMariaDB,
     rmarkdown,
-    testthat
+    testthat,
+    yaml
 VignetteBuilder: 
     knitr
 Encoding: UTF-8

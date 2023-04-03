@@ -2,7 +2,7 @@
 % Please edit documentation in R/importe_debit_siva.R
 \name{importe_debit_siva}
 \alias{importe_debit_siva}
-\title{Imports flow from the SIVA package}
+\title{Imports flow from the SIVA package and calculates mean daily flow}
 \usage{
 importe_debit_siva(debut, fin, con)
 }

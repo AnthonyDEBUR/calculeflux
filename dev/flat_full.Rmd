@@ -2269,7 +2269,7 @@ Il faut télécharger le package SIVA
 `r devtools::install_github("https://github.com/Eaux-et-Vilaine/SIVA")`
         
 ```{r function-importe_debit_siva}
-#' Imports flow from the SIVA package
+#' Imports flow from the SIVA package and calculates mean daily flow
 #' 
 #' This function will load data from the Arzal dam
 #' @inheritParams SIVA::load_debit_barrage
@@ -2284,7 +2284,9 @@ importe_debit_siva <- function(debut,
  dat <- SIVA::load_debit_barrage(debut=debut,
      fin=fin,
      con=pool)
- return(dat)
+ param <- SIVA::param
+  dj <- SIVA::debit_journalier(dat, type="recalcule")
+ return(dj)
 }
 ```
   
