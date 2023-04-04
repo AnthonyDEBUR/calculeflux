@@ -1959,7 +1959,7 @@ importe_qualite_hubeau <-   function(code_station=NULL,
   limite_api_hubeau <- 20000
   
   if(is.null(code_station) & is.null(code_parametre) & (is.null(date_debut) | is.null(date_fin))){
-    stop("importe_qualite_hubeau : code_station, code_parametre & (date_debut or date_fin) can't be NULL together")
+    stop("importe_qualite_hubeau : code_station, code_parametre & (date_debut or date_fin) can\'t be NULL together")
   }
   if(!is.null(code_station)){
   if (!is.character(code_station) & !is.factor(code_station)) {
