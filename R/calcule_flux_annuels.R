@@ -254,7 +254,7 @@ debit$annee_hydro<-cut(debit$date_obs_elab, breaks=seuils_coupure, labels=lbl_co
 P90_analyses<-analyses%>%
   dplyr::group_by(annee_hydro)%>%
   dplyr::summarise(P90=tools4DCE::PercentileDCE(RsAna))%>%
-  ungroup()
+  dplyr::ungroup()
 
 
 
