@@ -23,8 +23,8 @@
 #' @param methode : methode used to calculate fluxes. Default = "M6". 
 #' See calcule_flux for more details.
 #' @param out : required output. Values can be : "flux" : only flux are returned,
-#' "hydrau" : only hydraulicity is returned, and "flux_hydrau_pond" : flux, hydraulicity
-#' and ponderaty flux by hydraulicity are returned.
+#' "hydrau" : only hydraulicity is returned, and "flux_hydrau_pond" : flux, hydraulicity,
+#'  ponderate flux by hydraulicity and 90 percentile are returned.
 #' @param minimum_rs_ana : minimum number of data of concentration in one hydraulic 
 #' year to make the calculus. Default = 6 : Calculus are not done for years with  
 #' strictly less than 6 data of concentrations
@@ -43,6 +43,7 @@
 #' - Cmoy :mean of concentration = flux / debit_tot in mg/L
 #' - hydraulicity : hydraulicity
 #' - flux_pond : flux ponderate by hydraulicity in kg/year (if analyses in mg/L)
+#' - P90 : 90 percentile of NO3 calculated according "Arrete ministeriel du 25 janvier 2010"
 #' 
 #'  
 #' @export
@@ -249,6 +250,14 @@ analyses$annee_hydro<-cut(analyses$DatePrel, breaks=seuils_coupure, labels=lbl_c
 analyses$mois<-format(analyses$DatePrel, "%m")
 debit$annee_hydro<-cut(debit$date_obs_elab, breaks=seuils_coupure, labels=lbl_coupure)
 
+# percentile 90 des concentrations en NO3 par année hydro
+P90_analyses<-analyses%>%
+  dplyr::group_by(annee_hydro)%>%
+  dplyr::summarise(P90=tools4DCE::PercentileDCE(RsAna))%>%
+  ungroup()
+
+
+
 # calcul du nombre de données de concentration et de debit par annee
 resultat_Q<-debit%>%
   subset(!is.na(annee_hydro))%>%
@@ -283,6 +292,7 @@ nb_jours<-data.frame(annee_hydro=lbl_coupure,
 resultat<-dplyr::full_join(resultat, nb_jours, by="annee_hydro")
 resultat<-dplyr::full_join(resultat, Qannuel, by="annee_hydro")
 resultat$debit_an<-resultat$debit_an/resultat$N_Qjm*resultat$nb_jours*24*3600/1000
+resultat<-dplyr::full_join(resultat, P90_analyses, by="annee_hydro")
 resultat<-resultat%>%dplyr::arrange(annee_hydro)
 
 # calcul du flux si demandé
@@ -333,7 +343,7 @@ calcul_hydrau_annuel<-function(i)
   date_fin_calcul=(seuils_coupure[i]+lubridate::years(1))-1
 )
 }
-# periodes à calculer : nb résultat analyses suffisant et existence de aleurs de débit
+# periodes à calculer : nb résultat analyses suffisant et existence de valeurs de débit
 a_calculer<-seq(1,length(lbl_coupure))[!is.na(resultat$N_Qjm)]
 
 resultat$hydraulicity<-NA
@@ -344,7 +354,7 @@ resultat$hydraulicity<-NA
 
 }
 
-# calcul du flux pondéré par l'hydraulicité
+# calcul du flux pondéré par l'hydraulicité et des percentiles 90
 if(out%in%c("flux_hydrau_pond"))
 {
 resultat$flux_pond<-resultat$flux/resultat$hydraulicity

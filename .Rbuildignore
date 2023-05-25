@@ -1,6 +1,9 @@
-
 ^dev$
 ^LICENSE\.md$
 ^.*\.Rproj$
 ^\.Rproj\.user$
+credentials.yml
+.project
 ^calculeflux\.Rproj$
+.settings
+

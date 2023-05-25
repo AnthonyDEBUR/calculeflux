@@ -3,6 +3,12 @@
 .Rdata
 .httr-oauth
 .DS_Store
+<<<<<<< HEAD
 inst/doc
 dev/macroflux/*
 
+=======
+/credentials.yml
+.settings
+.project
+>>>>>>> importe_debit_siva

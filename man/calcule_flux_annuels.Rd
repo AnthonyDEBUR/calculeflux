@@ -46,8 +46,8 @@ in which results are stored. Default = "resultat_obs_elab"}
 See calcule_flux for more details.}
 
 \item{out}{: required output. Values can be : "flux" : only flux are returned,
-"hydrau" : only hydraulicity is returned, and "flux_hydrau_pond" : flux, hydraulicity
-and ponderaty flux by hydraulicity are returned.}
+"hydrau" : only hydraulicity is returned, and "flux_hydrau_pond" : flux, hydraulicity,
+ponderate flux by hydraulicity and 90 percentile are returned.}
 
 \item{minimum_rs_ana}{: minimum number of data of concentration in one hydraulic
 year to make the calculus. Default = 6 : Calculus are not done for years with
@@ -69,6 +69,7 @@ data.frame with columns :
 \item Cmoy :mean of concentration = flux / debit_tot in mg/L
 \item hydraulicity : hydraulicity
 \item flux_pond : flux ponderate by hydraulicity in kg/year (if analyses in mg/L)
+\item P90 : 90 percentile of NO3 calculated according "Arrete ministeriel du 25 janvier 2010"
 }
 }
 \description{
