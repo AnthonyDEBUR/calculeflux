@@ -30,3 +30,35 @@ test_that("importe_debit_siva works",
             )# 23 s maison
             expect_is(debit_barrage, "data.frame")
           })
+
+      
+      test_that("importe_debit_siva works in 2009",
+          {
+            skip_if_not(interactive())
+            tryCatch({
+                  cred <- yaml::read_yaml("credentials.yml")
+                }, error = function(e) {
+                  "You need to have the credentials to connect to SIVA"
+                })
+            
+            hostmysql. <- cred$hostmysql
+            pwdmysql. <- cred$pwdmysql
+            umysql. <- cred$usermysql
+            
+            pool <- pool::dbPool(
+                drv = RMariaDB::MariaDB(),
+                dbname = "archive_IAV",
+                host = hostmysql.,
+                username = umysql.,
+                password = pwdmysql.,
+                port = 3306
+            )
+            system.time(
+                debit_barrage <- importe_debit_siva(
+                    debut = as.POSIXct(strptime("2009-01-01 00:00:00", format = "%Y-%m-%d %H:%M:%S")),
+                    fin = as.POSIXct(strptime("2009-01-10 00:00:00", format = "%Y-%m-%d %H:%M:%S")),
+                    con = pool
+                )
+            )# 23 s maison
+            expect_is(debit_barrage, "data.frame")
+          })     
