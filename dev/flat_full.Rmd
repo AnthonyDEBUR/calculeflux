@@ -1311,8 +1311,8 @@ test_that("importe_BV_amont works", {
 #' @param methode : methode used to calculate fluxes. Default = "M6". 
 #' See calcule_flux for more details.
 #' @param out : required output. Values can be : "flux" : only flux are returned,
-#' "hydrau" : only hydraulicity is returned, and "flux_hydrau_pond" : flux, hydraulicity
-#' and ponderaty flux by hydraulicity are returned.
+#' "hydrau" : only hydraulicity is returned, and "flux_hydrau_pond" : flux, hydraulicity,
+#'  ponderate flux by hydraulicity and 90 percentile are returned.
 #' @param minimum_rs_ana : minimum number of data of concentration in one hydraulic 
 #' year to make the calculus. Default = 6 : Calculus are not done for years with  
 #' strictly less than 6 data of concentrations
@@ -1331,6 +1331,7 @@ test_that("importe_BV_amont works", {
 #' - Cmoy :mean of concentration = flux / debit_tot in mg/L
 #' - hydraulicity : hydraulicity
 #' - flux_pond : flux ponderate by hydraulicity in kg/year (if analyses in mg/L)
+#' - P90 : 90 percentile of NO3 calculated according "Arrete ministeriel du 25 janvier 2010"
 #' 
 #'  
 #' @export
@@ -1512,6 +1513,14 @@ analyses$annee_hydro<-cut(analyses$DatePrel, breaks=seuils_coupure, labels=lbl_c
 analyses$mois<-format(analyses$DatePrel, "%m")
 debit$annee_hydro<-cut(debit$date_obs_elab, breaks=seuils_coupure, labels=lbl_coupure)
 
+# percentile 90 des concentrations en NO3 par année hydro
+P90_analyses<-analyses%>%
+  dplyr::group_by(annee_hydro)%>%
+  dplyr::summarise(P90=tools4DCE::PercentileDCE(RsAna))%>%
+  ungroup()
+
+
+
 # calcul du nombre de données de concentration et de debit par annee
 resultat_Q<-debit%>%
   subset(!is.na(annee_hydro))%>%
@@ -1546,6 +1555,7 @@ nb_jours<-data.frame(annee_hydro=lbl_coupure,
 resultat<-dplyr::full_join(resultat, nb_jours, by="annee_hydro")
 resultat<-dplyr::full_join(resultat, Qannuel, by="annee_hydro")
 resultat$debit_an<-resultat$debit_an/resultat$N_Qjm*resultat$nb_jours*24*3600/1000
+resultat<-dplyr::full_join(resultat, P90_analyses, by="annee_hydro")
 resultat<-resultat%>%dplyr::arrange(annee_hydro)
 
 # calcul du flux si demandé
@@ -1596,7 +1606,7 @@ calcul_hydrau_annuel<-function(i)
   date_fin_calcul=(seuils_coupure[i]+lubridate::years(1))-1
 )
 }
-# periodes à calculer : nb résultat analyses suffisant et existence de aleurs de débit
+# periodes à calculer : nb résultat analyses suffisant et existence de valeurs de débit
 a_calculer<-seq(1,length(lbl_coupure))[!is.na(resultat$N_Qjm)]
 
 resultat$hydraulicity<-NA
@@ -1607,7 +1617,7 @@ resultat$hydraulicity<-NA
 
 }
 
-# calcul du flux pondéré par l'hydraulicité
+# calcul du flux pondéré par l'hydraulicité et des percentiles 90
 if(out%in%c("flux_hydrau_pond"))
 {
 resultat$flux_pond<-resultat$flux/resultat$hydraulicity
@@ -2344,6 +2354,476 @@ test_that("importe_debit_siva works",
             )# 23 s maison
             expect_is(debit_barrage, "data.frame")
           })
+```
+# importe_stations_piezo_hubeau
+    
+```{r function-importe_stations_piezo_hubeau}
+#' This function allows for importing available piezometric data from the Piezometrie 
+#' HUB'EAU API (https://hubeau.eaufrance.fr/page/api-piezometrie).
+#' 
+#' @param code_bss vector with list of old bss code for piezometre (ex. 04193X0022/S2-6) 
+#' @param nouveau_bss vector with list of new bss code for piezometre (ex. BSS001DJDP) 
+#' @param shp_emprise sf object La fonctionnalité semble non fonctionnelle au 25/05/2023 sous hubeau. A ne pas utiliser avant correction du bug.
+#'
+#' if both code_bss and nouveau_bss are provided, the function return results only for old bss.
+#' if shp_emprise is provided, code_bss and nouveau_bss are not considerated.
+#'
+#' @return the function returns a tibble with the description of the piezometric station, 
+#' 
+#' @export
+importe_stations_piezo_hubeau <- function(code_bss = NULL,
+                                          nouveau_bss = NULL,
+                                          shp_emprise = NULL) {
+  #astuces pour éviter note no visible binding for global variable
+  . <- NULL
+  
+  
+  # profondeur de resultat max selon API hubeau
+  limite_api_hubeau <- 20000
+  
+  if (is.null(code_bss) &
+      is.null(nouveau_bss) & is.null(shp_emprise)) {
+    stop(
+      "importe_stations_piezo_hubeau : code_bss, nouveau_bss and shp_emprise can\'t be NULL together"
+    )
+  }
+  if (!is.null(code_bss)) {
+    if (!is.character(code_bss) & !is.factor(code_bss)) {
+      stop("importe_stations_piezo_hubeau : code_bss must be of class character or factor")
+    }
+  }
+  if (!is.null(nouveau_bss)) {
+    if (!is.character(nouveau_bss) & !is.factor(nouveau_bss)) {
+      stop(
+        "importe_stations_piezo_hubeau : nouveau_bss must be of class character or factor"
+      )
+    }
+  }
+  
+  if (!is.null(shp_emprise)) {
+    if (!"sf" %in% class(shp_emprise)) {
+      stop("importe_stations_piezo_hubeau : shp_emprise must be of class sf")
+    }
+    shp_emprise <- sf::st_transform(shp_emprise, crs = 4326)
+  }
+  
+  #on traite les codes par ordre de priorité
+  if (!is.null(shp_emprise)) {
+    code_bss <- NULL
+    nouveau_bss <- NULL
+  }
+  
+  #on traite les codes par ordre de priorité
+  if (!is.null(code_bss)) {
+    nouveau_bss <- NULL
+  }
+  
+  # https://hubeau.eaufrance.fr/api/v1/niveaux_nappes/stations?bss_id=BSS001ESVY&format=json&size=20
+  
+  url_base <-
+    "https://hubeau.eaufrance.fr/api/v1/niveaux_nappes/stations?"
+  
+  ##### On determine le nb de resultat renvoye par la requete #####
+  
+  ss_fct_requet <- function(code_bss0,
+                            nouveau_bss0,
+                            shp_emprise0,
+                            size0)
+  {
+    requete <- list(size = size0)
+    
+    if (!is.null(code_bss0)) {
+      requete <-
+        c(requete, code_bss = list(paste0(code_bss0, collapse = ",")))
+    }
+    if (!is.null(nouveau_bss0)) {
+      requete <-
+        c(requete, bss_id = list(paste0(nouveau_bss0, collapse = ",")))
+    }
+    
+    if (!is.null(shp_emprise0)) {
+      requete <-
+        c(requete, bbox =list(
+          sf::st_bbox(shp_emprise0)[1],
+          sf::st_bbox(shp_emprise0)[2],
+          sf::st_bbox(shp_emprise0)[3],
+          sf::st_bbox(shp_emprise0)[4]
+          ))
+    }
+    
+    data <- httr::GET(url_base,
+                      query = requete)
+    
+    httr::warn_for_status(data)
+    httr::stop_for_status(data)
+    
+    return(data)
+  }
+  
+  ss_fct_nb_rslt <- function(data00) {
+    nb_result0 <- data00 %>%
+      httr::content(as = 'text', encoding = "UTF-8") %>%
+      jsonlite::fromJSON()
+    
+    return(nb_result0$count)
+  }
+  
+  ss_fct_tab_rslt <- function(data00) {
+    # print(data00$url)
+    if (data00$status_code %in% c(200, 206))
+    {
+      data00 <- data00 %>%
+        httr::content(as = 'text', encoding = "UTF-8") %>%
+        jsonlite::fromJSON() %>%
+        .$data
+    } else
+    {
+      stop(
+        paste0(
+          "importe_stations_piezo_hubeau : error in Hubeau API result, status code = ",
+          data00$status_code,
+          " - url = ",
+          data00$url
+        )
+      )
+    }
+    return(data00)
+  }
+  
+  
+  #nb de resultat renvoyés par la requête
+  data0 <- ss_fct_requet(
+    code_bss0 = code_bss,
+    nouveau_bss0 = nouveau_bss,
+    shp_emprise0 = shp_emprise,
+    size0 = 10
+  )
+  
+  nb_result <- ss_fct_nb_rslt(data0)
+  
+  # traitement différencié si tous les résultats peuvent ou pas être exportés par Hubeau.
+  # Si oui alors on les exporte, si non, erreur
+  if (nb_result <= limite_api_hubeau & nb_result > 0)
+  {
+    data0 <- ss_fct_requet(
+      code_bss0 = code_bss,
+      nouveau_bss0 = nouveau_bss,
+      shp_emprise0 = shp_emprise,
+      size0 = limite_api_hubeau
+    )
+    
+    data0 <- ss_fct_tab_rslt(data0)
+    
+  } else if (nb_result > 0)
+  {
+    stop(
+      "importe_stations_piezo_hubeau : unable to get all available results, try to restrict input parameters"
+    )
+  } else {
+    data0 <- data.frame()
+  }
+  
+  if (nrow(data0) != nb_result) {
+    warning(
+      paste0(
+        "importe_piezo_hubeau : the fuction return ",
+        nrow(data0),
+        " lines whereas hubeau API should return ",
+        nb_result
+      )
+    )
+  }
+  
+  return(data0)
+  
+}
+```
+  
+```{r example-importe_stations_piezo_hubeau}
+# utils::data(sage_vilaine, package="calculeflux")
+# piezo_vilaine<-importe_stations_piezo_hubeau(shp_emprise=sage_vilaine)
+data_old_bss<-importe_stations_piezo_hubeau(code_bss=c("04193X0022/S2-6",
+                                                       "03862X0057/PZ"))
+data_new_bss<-importe_stations_piezo_hubeau(nouveau_bss=c("BSS001BHVJ",
+                                                       "BSS001DJDP",
+    "BSS001ESVY"))
+
+                                 
+
+```
+  
+```{r tests-importe_stations_piezo_hubeau}
+test_that("importe_stations_piezo_hubeau works", {
+  expect_true(inherits(importe_stations_piezo_hubeau, "function")) 
+  
+    data_old_bss<-importe_stations_piezo_hubeau(code_bss=c("04193X0022/S2-6",
+                                                       "03862X0057/PZ"))
+    
+
+  expect_true(nrow(data_old_bss)==2) 
+data_new_bss<-importe_stations_piezo_hubeau(nouveau_bss=c("BSS001BHVJ",
+                                                       "BSS001DJDP",
+                                                          "BSS001ESVY"))
+  expect_true(nrow(data_new_bss)==3) 
+  
+})
+```
+  
+# importe_piezo_hubeau    
+```{r function-importe_piezo_hubeau}
+#' This function allows for importing available piezometric data from the Piezometrie 
+#' HUB'EAU API (https://hubeau.eaufrance.fr/page/api-piezometrie).
+#' 
+#' @param code_bss vector with list of old bss code for piezometre (ex. 04193X0022/S2-6) 
+#' @param date_debut start date of observations to retrieve (optional)
+#' @param date_fin end date of observations to retrieve (optional)
+#'
+#' @return the function returns a tibble with the code of the piezotric station, 
+#' the date, and the daily piezometric 
+#' 
+#' @export
+importe_piezo_hubeau <- function(code_bss,
+                                 date_debut = NULL,
+                                 date_fin = NULL) {
+  #astuces pour éviter note no visible binding for global variable
+  . <- NULL
+  
+  # profondeur de resultat max selon API hubeau
+  limite_api_hubeau <- 20000
+  
+  if(is.null(code_bss)){
+    stop("importe_piezo_hubeau : code_bss can\'t be NULL")
+  }
+  if(!is.null(code_bss)){
+  if (!is.character(code_bss) & !is.factor(code_bss)) {
+    stop("importe_piezo_hubeau : code_bss must be of class character or factor")
+  }}
+
+  if (!is.null(date_debut)) {
+    if (!lubridate::is.Date(date_debut)) {
+      stop("importe_piezo_hubeau : date_debut must be of class Date")
+    }
+  } else {
+    date_debut <- as.Date("1900-01-01")
+  }
+  
+  
+  if (!is.null(date_fin)) {
+    if (!lubridate::is.Date(date_fin)) {
+      stop("importe_piezo_hubeau : date_fin must be of class Date")
+    }
+  } else {
+    date_fin <- as.Date(Sys.Date())
+  }
+  
+  url_base <-
+    "https://hubeau.eaufrance.fr/api/v1/niveaux_nappes/chroniques?"
+  
+  ##### On determine le nb de resultat renvoye par la requete #####
+  
+  ss_fct_requet <- function(code_bss0,
+                            date_debut0,
+                            date_fin0,
+                            size0)
+  {
+    requete <- list(
+      date_debut_mesure = date_debut0,
+      date_fin_mesure = date_fin0,
+      size = size0
+    )
+    
+      if (!is.null(code_bss0)) {
+      requete <-
+        c(requete, code_bss = list(paste0(code_bss0, collapse = ",")))
+    }
+ 
+    
+    data <- httr::GET(url_base,
+                      query = requete)
+    
+    httr::warn_for_status(data)
+    httr::stop_for_status(data)
+    
+    return(data)
+  }
+  
+  ss_fct_nb_rslt <- function(data00) {
+    nb_result0 <- data00 %>%
+      httr::content(as = 'text', encoding = "UTF-8") %>%
+      jsonlite::fromJSON()
+    
+    return(nb_result0$count)
+  }
+  
+  ss_fct_tab_rslt <- function(data00) {
+   # print(data00$url)
+    if (data00$status_code == 200)
+    {
+      data00 <- data00 %>%
+        httr::content(as = 'text', encoding = "UTF-8") %>%
+        jsonlite::fromJSON() %>%
+        .$data
+    } else
+    {
+      stop(
+        paste0(
+          "importe_piezo_hubeau : error in Hubeau API result, status code = ",
+          data00$status_code,
+          " - url = ",
+          data00$url
+        )
+      )
+    }
+    return(data00)
+  }
+  
+  
+  #nb de resultat renvoyés par la requête
+  data0 <- ss_fct_requet(
+    code_bss0 = code_bss,
+    date_debut0 = date_debut,
+    date_fin0 = date_fin,
+    size0 = 10
+  )
+  
+  nb_result <- ss_fct_nb_rslt(data0)
+  
+  # traitement différencié si tous les résultats peuvent ou pas être exportés par Hubeau.
+  # Si oui alors on les exporte, si non alors on split la requête pour pouvoir faire plusieurs exports
+  if (nb_result <= limite_api_hubeau & nb_result>0)
+  {
+    data0 <- ss_fct_requet(
+      code_bss0 = code_bss,
+    date_debut0 = date_debut,
+    date_fin0 = date_fin,
+    size0 = limite_api_hubeau
+    )
+    
+    
+    data0 <- ss_fct_tab_rslt(data0)
+    
+    
+    
+  } else if (nb_result>0)
+  {
+    ##### Si trop de lignes pour exporter en une fois, on split la requête #####
+    
+    # on decoupe en n intervalles les périodes demandées
+    nb_split <- ceiling(nb_result / limite_api_hubeau)
+    
+    trg_split_en_cours <- TRUE
+    k <- 1
+    
+    while (trg_split_en_cours) {
+      # nb de jours dans chaque intervalle
+      nb_day_interv <- round((date_fin - date_debut) / (k * nb_split))
+      
+      # on decoupe les dates en nb de split
+      dates_a_traiter <- unique(c(seq(date_debut, date_fin, by = nb_day_interv), date_fin))
+      dates_a_traiter <-
+        data.frame(dates_debut = (dates_a_traiter[1:(length(dates_a_traiter) - 1)]+1),
+                   dates_fin = dates_a_traiter[2:length(dates_a_traiter)])
+      dates_a_traiter[1,]$dates_debut<-dates_a_traiter[1,]$dates_debut-1
+      
+      #on compte le nb de resultats de chaque période
+      nb_rst_per <- function(i)
+      {
+        data0 <- ss_fct_requet(
+                 code_bss0 = code_bss,
+          date_debut0 = dates_a_traiter$dates_debut[i],
+          date_fin0 = dates_a_traiter$dates_fin[i],
+          size0 = 10
+        )
+        
+        return(ss_fct_nb_rslt(data0))
+      }
+      
+      dates_a_traiter$nb <-
+        sapply(seq(1, nrow(dates_a_traiter)), nb_rst_per)
+      
+      k <- k + 1
+      if (all(dates_a_traiter$nb < limite_api_hubeau)) {
+        trg_split_en_cours <- FALSE
+      }
+      if (k >= nb_day_interv) {
+        stop(
+          "importe_qualite_hubeau : unable to get all available results, try to restrict input parameters"
+        )
+      }
+    }
+    rm(k, trg_split_en_cours, nb_split)
+    
+    # on regroupe des lots à traiter les plus gros possibles
+    l0 <- 1
+    lot <- 1
+    dates_a_traiter$lot <- 0
+    for (k in 1:nrow(dates_a_traiter)) {
+      if (sum(dates_a_traiter$nb[l0:k]) < limite_api_hubeau) {
+        dates_a_traiter$lot[k] <- lot
+      } else
+      {
+        lot <- lot + 1
+        dates_a_traiter$lot[k] <- lot
+        l0 <- k
+      }
+    }
+    rm(l0, lot)
+    dates_a_traiter<-dates_a_traiter[dates_a_traiter$nb!=0,]
+      
+    lots <- unique(dates_a_traiter$lot)
+
+    ##### On rapatrie les données par lot de date #####
+    data0 <- do.call(dplyr::bind_rows,
+                     lapply(lots,
+                            function(lot0) {
+                              print(paste0("treating batch ", lot0, " on ", length(lots)))
+                              tmp123<-ss_fct_tab_rslt(
+                                ss_fct_requet(
+                                  code_bss0 = code_bss,
+                                  code_station0 = code_station,
+                                  date_debut0 = min(dates_a_traiter[dates_a_traiter$lot ==
+                                                                      lot0, ]$dates_debut),
+                                  date_fin0 = max(dates_a_traiter[dates_a_traiter$lot ==
+                                                                    lot0, ]$dates_fin),
+                                  size0 = limite_api_hubeau,
+                                  code_parametre0 = code_parametre,
+                                  code_support0 = code_support,
+                                  code_fraction0 = code_fraction
+                                )
+                              )
+                              Sys.sleep(0.3)
+                              return(tmp123)
+                            }))
+    
+  } else {data0<-data.frame()}
+  
+  if(nrow(data0)!=nb_result) {warning(paste0("importe_piezo_hubeau : the fuction return ",
+                                             nrow(data0), " lines whereas hubeau API should return ", nb_result))}
+  
+  return(data0)
+
+  
+}
+```
+  
+```{r example-importe_piezo_hubeau}
+importe_piezo_hubeau(code_bss="04193X0022/S2-6",
+                     date_debut = as.Date("2010-01-01"),
+                     date_fin=as.Date("2011-01-01"))
+
+  # https://hubeau.eaufrance.fr/api/v1/niveaux_nappes/chroniques?&date_debut_mesure=2010-01-01&date_fin_mesure=2011-01-01&size=20
+```
+  
+```{r tests-importe_piezo_hubeau}
+test_that("importe_piezo_hubeau works", {
+  expect_true(inherits(importe_piezo_hubeau, "function")) 
+  
+  tmp<-importe_piezo_hubeau(code_bss="04193X0022/S2-6",
+                     date_debut = as.Date("2010-01-01"),
+                     date_fin=as.Date("2011-01-01"))
+ 
+  expect_true(nrow(tmp)==366) 
+})
 ```
   
 
