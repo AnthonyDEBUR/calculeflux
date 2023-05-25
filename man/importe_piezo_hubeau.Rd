@@ -23,9 +23,17 @@ This function allows for importing available piezometric data from the Piezometr
 HUB'EAU API (https://hubeau.eaufrance.fr/page/api-piezometrie).
 }
 \examples{
-importe_piezo_hubeau(code_bss="04193X0022/S2-6",
-                     date_debut = as.Date("2010-01-01"),
-                     date_fin=as.Date("2011-01-01"))
+tmp<-importe_piezo_hubeau(code_bss=c("04193X0022/S2-6",
+                                     "04518X0045/MSM1",
+                                     "04218X0035/F1",
+                                     "04514X0018/01",
+                                     "04513X0112/OS1",
+                                     "03555X6010/PZ1"),
+                     date_debut = as.Date("1990-01-01"),
+                     date_fin=as.Date("2023-01-01"))
+
+
+
 
   # https://hubeau.eaufrance.fr/api/v1/niveaux_nappes/chroniques?&date_debut_mesure=2010-01-01&date_fin_mesure=2011-01-01&size=20
 }

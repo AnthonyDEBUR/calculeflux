@@ -2363,7 +2363,7 @@ test_that("importe_debit_siva works",
 #' 
 #' @param code_bss vector with list of old bss code for piezometre (ex. 04193X0022/S2-6) 
 #' @param nouveau_bss vector with list of new bss code for piezometre (ex. BSS001DJDP) 
-#' @param shp_emprise sf object La fonctionnalité semble non fonctionnelle au 25/05/2023 sous hubeau. A ne pas utiliser avant correction du bug.
+#' @param shp_emprise sf object 
 #'
 #' if both code_bss and nouveau_bss are provided, the function return results only for old bss.
 #' if shp_emprise is provided, code_bss and nouveau_bss are not considerated.
@@ -2440,14 +2440,14 @@ importe_stations_piezo_hubeau <- function(code_bss = NULL,
       requete <-
         c(requete, bss_id = list(paste0(nouveau_bss0, collapse = ",")))
     }
-    
+  # https://hubeau.eaufrance.fr/api/v1/niveaux_nappes/stations?size=10&bbox=-3.03018376325782,47.3232352809044,-0.952777911547637,48.4031769229588  
     if (!is.null(shp_emprise0)) {
       requete <-
-        c(requete, bbox =list(
+        c(requete, bbox =list(paste(
           sf::st_bbox(shp_emprise0)[1],
           sf::st_bbox(shp_emprise0)[2],
           sf::st_bbox(shp_emprise0)[3],
-          sf::st_bbox(shp_emprise0)[4]
+          sf::st_bbox(shp_emprise0)[4], sep=",")
           ))
     }
     
@@ -2540,8 +2540,8 @@ importe_stations_piezo_hubeau <- function(code_bss = NULL,
 ```
   
 ```{r example-importe_stations_piezo_hubeau}
-# utils::data(sage_vilaine, package="calculeflux")
-# piezo_vilaine<-importe_stations_piezo_hubeau(shp_emprise=sage_vilaine)
+ utils::data(sage_vilaine, package="calculeflux")
+ piezo_vilaine<-importe_stations_piezo_hubeau(shp_emprise=sage_vilaine)
 data_old_bss<-importe_stations_piezo_hubeau(code_bss=c("04193X0022/S2-6",
                                                        "03862X0057/PZ"))
 data_new_bss<-importe_stations_piezo_hubeau(nouveau_bss=c("BSS001BHVJ",
@@ -2565,6 +2565,10 @@ data_new_bss<-importe_stations_piezo_hubeau(nouveau_bss=c("BSS001BHVJ",
                                                        "BSS001DJDP",
                                                           "BSS001ESVY"))
   expect_true(nrow(data_new_bss)==3) 
+  
+  
+   piezo_vilaine<-importe_stations_piezo_hubeau(shp_emprise=sage_vilaine)
+  expect_true(nrow(data_new_bss)>62) 
   
 })
 ```
@@ -2780,15 +2784,11 @@ importe_piezo_hubeau <- function(code_bss,
                               tmp123<-ss_fct_tab_rslt(
                                 ss_fct_requet(
                                   code_bss0 = code_bss,
-                                  code_station0 = code_station,
                                   date_debut0 = min(dates_a_traiter[dates_a_traiter$lot ==
                                                                       lot0, ]$dates_debut),
                                   date_fin0 = max(dates_a_traiter[dates_a_traiter$lot ==
                                                                     lot0, ]$dates_fin),
-                                  size0 = limite_api_hubeau,
-                                  code_parametre0 = code_parametre,
-                                  code_support0 = code_support,
-                                  code_fraction0 = code_fraction
+                                  size0 = limite_api_hubeau
                                 )
                               )
                               Sys.sleep(0.3)
@@ -2807,9 +2807,17 @@ importe_piezo_hubeau <- function(code_bss,
 ```
   
 ```{r example-importe_piezo_hubeau}
-importe_piezo_hubeau(code_bss="04193X0022/S2-6",
-                     date_debut = as.Date("2010-01-01"),
-                     date_fin=as.Date("2011-01-01"))
+tmp<-importe_piezo_hubeau(code_bss=c("04193X0022/S2-6",
+                                     "04518X0045/MSM1",
+                                     "04218X0035/F1",
+                                     "04514X0018/01",
+                                     "04513X0112/OS1",
+                                     "03555X6010/PZ1"),
+                     date_debut = as.Date("1990-01-01"),
+                     date_fin=as.Date("2023-01-01"))
+
+
+
 
   # https://hubeau.eaufrance.fr/api/v1/niveaux_nappes/chroniques?&date_debut_mesure=2010-01-01&date_fin_mesure=2011-01-01&size=20
 ```

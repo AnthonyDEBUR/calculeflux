@@ -12,9 +12,17 @@
 #' 
 #' @export
 #' @examples
-#' importe_piezo_hubeau(code_bss="04193X0022/S2-6",
-#'                      date_debut = as.Date("2010-01-01"),
-#'                      date_fin=as.Date("2011-01-01"))
+#' tmp<-importe_piezo_hubeau(code_bss=c("04193X0022/S2-6",
+#'                                      "04518X0045/MSM1",
+#'                                      "04218X0035/F1",
+#'                                      "04514X0018/01",
+#'                                      "04513X0112/OS1",
+#'                                      "03555X6010/PZ1"),
+#'                      date_debut = as.Date("1990-01-01"),
+#'                      date_fin=as.Date("2023-01-01"))
+#' 
+#' 
+#' 
 #' 
 #'   # https://hubeau.eaufrance.fr/api/v1/niveaux_nappes/chroniques?&date_debut_mesure=2010-01-01&date_fin_mesure=2011-01-01&size=20
 importe_piezo_hubeau <- function(code_bss,
@@ -215,15 +223,11 @@ importe_piezo_hubeau <- function(code_bss,
                               tmp123<-ss_fct_tab_rslt(
                                 ss_fct_requet(
                                   code_bss0 = code_bss,
-                                  code_station0 = code_station,
                                   date_debut0 = min(dates_a_traiter[dates_a_traiter$lot ==
                                                                       lot0, ]$dates_debut),
                                   date_fin0 = max(dates_a_traiter[dates_a_traiter$lot ==
                                                                     lot0, ]$dates_fin),
-                                  size0 = limite_api_hubeau,
-                                  code_parametre0 = code_parametre,
-                                  code_support0 = code_support,
-                                  code_fraction0 = code_fraction
+                                  size0 = limite_api_hubeau
                                 )
                               )
                               Sys.sleep(0.3)

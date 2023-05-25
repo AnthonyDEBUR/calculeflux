@@ -5,7 +5,7 @@
 #' 
 #' @param code_bss vector with list of old bss code for piezometre (ex. 04193X0022/S2-6) 
 #' @param nouveau_bss vector with list of new bss code for piezometre (ex. BSS001DJDP) 
-#' @param shp_emprise sf object La fonctionnalité semble non fonctionnelle au 25/05/2023 sous hubeau. A ne pas utiliser avant correction du bug.
+#' @param shp_emprise sf object 
 #'
 #' if both code_bss and nouveau_bss are provided, the function return results only for old bss.
 #' if shp_emprise is provided, code_bss and nouveau_bss are not considerated.
@@ -14,8 +14,8 @@
 #' 
 #' @export
 #' @examples
-#' # utils::data(sage_vilaine, package="calculeflux")
-#' # piezo_vilaine<-importe_stations_piezo_hubeau(shp_emprise=sage_vilaine)
+#'  utils::data(sage_vilaine, package="calculeflux")
+#'  piezo_vilaine<-importe_stations_piezo_hubeau(shp_emprise=sage_vilaine)
 #' data_old_bss<-importe_stations_piezo_hubeau(code_bss=c("04193X0022/S2-6",
 #'                                                        "03862X0057/PZ"))
 #' data_new_bss<-importe_stations_piezo_hubeau(nouveau_bss=c("BSS001BHVJ",
@@ -93,14 +93,14 @@ importe_stations_piezo_hubeau <- function(code_bss = NULL,
       requete <-
         c(requete, bss_id = list(paste0(nouveau_bss0, collapse = ",")))
     }
-    
+  # https://hubeau.eaufrance.fr/api/v1/niveaux_nappes/stations?size=10&bbox=-3.03018376325782,47.3232352809044,-0.952777911547637,48.4031769229588  
     if (!is.null(shp_emprise0)) {
       requete <-
-        c(requete, bbox =list(
+        c(requete, bbox =list(paste(
           sf::st_bbox(shp_emprise0)[1],
           sf::st_bbox(shp_emprise0)[2],
           sf::st_bbox(shp_emprise0)[3],
-          sf::st_bbox(shp_emprise0)[4]
+          sf::st_bbox(shp_emprise0)[4], sep=",")
           ))
     }
     

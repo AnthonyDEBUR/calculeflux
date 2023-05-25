@@ -13,4 +13,8 @@ data_new_bss<-importe_stations_piezo_hubeau(nouveau_bss=c("BSS001BHVJ",
                                                           "BSS001ESVY"))
   expect_true(nrow(data_new_bss)==3) 
   
+  
+   piezo_vilaine<-importe_stations_piezo_hubeau(shp_emprise=sage_vilaine)
+  expect_true(nrow(data_new_bss)>62) 
+  
 })

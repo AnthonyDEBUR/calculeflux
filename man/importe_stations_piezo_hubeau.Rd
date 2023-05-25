@@ -16,7 +16,7 @@ importe_stations_piezo_hubeau(
 
 \item{nouveau_bss}{vector with list of new bss code for piezometre (ex. BSS001DJDP)}
 
-\item{shp_emprise}{sf object La fonctionnalité semble non fonctionnelle au 25/05/2023 sous hubeau. A ne pas utiliser avant correction du bug.
+\item{shp_emprise}{sf object
 
 if both code_bss and nouveau_bss are provided, the function return results only for old bss.
 if shp_emprise is provided, code_bss and nouveau_bss are not considerated.}
@@ -29,8 +29,8 @@ This function allows for importing available piezometric data from the Piezometr
 HUB'EAU API (https://hubeau.eaufrance.fr/page/api-piezometrie).
 }
 \examples{
-# utils::data(sage_vilaine, package="calculeflux")
-# piezo_vilaine<-importe_stations_piezo_hubeau(shp_emprise=sage_vilaine)
+ utils::data(sage_vilaine, package="calculeflux")
+ piezo_vilaine<-importe_stations_piezo_hubeau(shp_emprise=sage_vilaine)
 data_old_bss<-importe_stations_piezo_hubeau(code_bss=c("04193X0022/S2-6",
                                                        "03862X0057/PZ"))
 data_new_bss<-importe_stations_piezo_hubeau(nouveau_bss=c("BSS001BHVJ",
