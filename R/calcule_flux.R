@@ -46,11 +46,13 @@ utils::globalVariables(c("DatePrel", "jour_mois"))
 #' debit <- read.csv2(datafile, encoding = "UTF-8")
 #' debit$date_obs_elab<-debit$date_obs_elab%>%as.Date()
 #' 
+#' 
+#' 
 #' calcule_flux(
-#'   nitrates,
+#'   analyses=nitrates,
 #'   col_dates_anal = "DatePrel",
 #'   col_analyses = "RsAna",
-#'   debit,
+#'   debit=debit,
 #'   methode = "M6",
 #'   date_debut_calcul=date_debut_calcul,
 #'   date_fin_calcul=date_fin_calcul
@@ -383,30 +385,52 @@ calcule_flux <- function(analyses,
 
      debit0<-debit%>%subset(DatePrel>=date_debut_calcul & DatePrel<=date_fin_calcul)
 
-    # calculus of concentration variations between 2 mesurements
-     analyses$RsAna_j_1<-c(NA,analyses$RsAna[1:length(analyses$RsAna)-1])
-      analyses$j_1<-c(as.Date("1800-01-01"),analyses$DatePrel[1:length(analyses$DatePrel)-1])
-      analyses$delta_j<-as.numeric(difftime(analyses$DatePrel,analyses$j_1))
-      analyses$gradient_con<-(analyses$RsAna-analyses$RsAna_j_1)/analyses$delta_j
-      
-  
+    # # calculus of concentration variations between 2 mesurements
+    #  analyses$RsAna_j_1<-c(NA,analyses$RsAna[1:length(analyses$RsAna)-1])
+    #   analyses$j_1<-c(as.Date("1800-01-01"),analyses$DatePrel[1:length(analyses$DatePrel)-1])
+    #   analyses$delta_j<-as.numeric(difftime(analyses$DatePrel,analyses$j_1))
+    #   analyses$gradient_con<-(analyses$RsAna-analyses$RsAna_j_1)/analyses$delta_j
+    #   
       # 
       # CiQi<-CiQi[c("DatePrel", "gradient_con")]
      
-     
-    resultats_365_j<-data.frame(DatePrel=seq(min(analyses$DatePrel, na.rm=T), max(analyses$DatePrel, na.rm=T), "day"))
-    resultats_365_j<-resultats_365_j%>%dplyr::left_join(debit, by="DatePrel")
-    resultats_365_j<-resultats_365_j%>%dplyr::left_join(analyses, by="DatePrel")
-    #resultats_365_j<-resultats_365_j%>%dplyr::left_join(CiQi, by="DatePrel")
+  
+      # Fonction pour effectuer l'interpolation linéaire
+interpolation_lineaire <- function(x) {
+  x$DatePrel <- as.numeric(x$DatePrel)  # Convertir la date en format numérique pour l'interpolation
+  x <- x[order(x$DatePrel), ]  # Trier les données par date_mesure
+  
+  # Utiliser la fonction 'approx' pour l'interpolation linéaire
+  interp_data <- approx(x$DatePrel, 
+                        x$RsAna, 
+                        xout = as.numeric(seq(min(analyses$DatePrel, na.rm=T), max(analyses$DatePrel, na.rm=T), "day")), 
+                        method = "linear")
+  
+  # Remplacer les valeurs manquantes par les valeurs interpolées
+  resultats_365_j<-data.frame(DatePrel=seq(min(analyses$DatePrel, na.rm=T), max(analyses$DatePrel, na.rm=T), "day"))
+  resultats_365_j<-resultats_365_j%>%dplyr::left_join(debit, by="DatePrel")
+  resultats_365_j$RsAna<-interp_data$y
+  
+  
+  return(resultats_365_j)
+}
 
-     # filling missing concentrations
-     resultats_365_j$gradient_con<-zoo::na.locf(resultats_365_j$gradient_con, fromLast = TRUE)
-     last_result<-NA
-     for(i in nrow(resultats_365_j):1)
-     {
-       if(is.na(resultats_365_j$RsAna[i])){resultats_365_j$RsAna[i]<-last_result-resultats_365_j$gradient_con[i]}
-        last_result<-resultats_365_j$RsAna[i]
-     }
+
+resultats_365_j<-interpolation_lineaire(analyses)
+
+    # resultats_365_j<-data.frame(DatePrel=seq(min(analyses$DatePrel, na.rm=T), max(analyses$DatePrel, na.rm=T), "day"))
+    # resultats_365_j<-resultats_365_j%>%dplyr::left_join(debit, by="DatePrel")
+    # resultats_365_j<-resultats_365_j%>%dplyr::left_join(analyses, by="DatePrel")
+    # #resultats_365_j<-resultats_365_j%>%dplyr::left_join(CiQi, by="DatePrel")
+    # 
+    #  # filling missing concentrations
+    #  resultats_365_j$gradient_con<-zoo::na.locf(resultats_365_j$gradient_con, fromLast = TRUE)
+    #  last_result<-NA
+    #  for(i in nrow(resultats_365_j):1)
+    #  {
+    #    if(is.na(resultats_365_j$RsAna[i])){resultats_365_j$RsAna[i]<-last_result-resultats_365_j$gradient_con[i]}
+    #     last_result<-resultats_365_j$RsAna[i]
+    #  }
 
      # keep only data of considered period
      resultats_365_j<-resultats_365_j%>%subset(DatePrel>=date_debut_calcul & DatePrel<=date_fin_calcul)

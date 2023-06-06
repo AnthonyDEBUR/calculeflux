@@ -66,11 +66,13 @@ datafile <- system.file("debit.csv", package = "calculeflux")
 debit <- read.csv2(datafile, encoding = "UTF-8")
 debit$date_obs_elab<-debit$date_obs_elab\%>\%as.Date()
 
+
+
 calcule_flux(
-  nitrates,
+  analyses=nitrates,
   col_dates_anal = "DatePrel",
   col_analyses = "RsAna",
-  debit,
+  debit=debit,
   methode = "M6",
   date_debut_calcul=date_debut_calcul,
   date_fin_calcul=date_fin_calcul

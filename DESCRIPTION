@@ -22,8 +22,7 @@ Imports:
     stringr,
     tools4DCE,
     utils,
-    xml2,
-    zoo
+    xml2
 Suggests: 
     ggplot2,
     knitr,
@@ -31,7 +30,8 @@ Suggests:
     RMariaDB,
     rmarkdown,
     testthat,
-    yaml
+    yaml,
+    zoo
 Citation: De Burghrave A., Briand C. (2023). calculeflux: package pour
     calculer des flux de nitrates.
     https://github.com/AnthonyDEBUR/calculeflux
