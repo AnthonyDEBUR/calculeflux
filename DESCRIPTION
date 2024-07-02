@@ -35,7 +35,8 @@ Suggests:
 Citation: De Burghrave A., Briand C. (2023). calculeflux: package pour
     calculer des flux de nitrates.
     https://github.com/AnthonyDEBUR/calculeflux
+Config/fusen/version: 0.5.2
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.2.3
+RoxygenNote: 7.3.1
 year: 2023

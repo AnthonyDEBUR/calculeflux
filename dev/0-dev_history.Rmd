@@ -20,9 +20,13 @@ fusen::fill_description(
     Description = "Calculation of fluxes with differents methods described in https://revue-set.fr/article/view/6291.",
     `Authors@R` = c(
       person("Anthony", "DE BURGHRAVE", email = "anthony.deburghrave@eaux-et-vilaine.bzh", role = c("aut", "cre")),
+      person("Cédric", "BRIAND", role = c("aut")),
       person(given = "ETPB Eaux & Vilaine", role = "cph")
-    )
-  )
+    ),
+    Citation = "De Burghrave A., Briand C. (2023). calculeflux: package pour calculer des flux de nitrates. https://github.com/AnthonyDEBUR/calculeflux",
+    year = 2023
+  ),
+  overwrite = TRUE
 )
 # Define License with use_*_license()
 usethis::use_mit_license("Anthony De Burghrave")

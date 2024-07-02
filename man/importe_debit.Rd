@@ -4,9 +4,7 @@
 \alias{importe_debit}
 \title{importe_debit}
 \usage{
-importe_debit(X, Y, date_debut, date_fin)
-
-importe_debit(X, Y, date_debut, date_fin)
+importe_debit(X, Y, date_debut, date_fin, source = "dreal")
 }
 \arguments{
 \item{X}{: coordonnée du point à partir duquel on souhaite estimer les débits en Lambert 93}
@@ -16,17 +14,13 @@ importe_debit(X, Y, date_debut, date_fin)
 \item{date_debut}{: date de début de la requête (format date)}
 
 \item{date_fin}{: date de fin de la requête (format date)}
+
+\item{source}{: source des données : archives_dreal ou hub_eau}
 }
 \value{
 dataframe avec 1 colonne date et 1 colonne qjm, qjm étant le débit journalier exprimé en L/s
-
-dataframe avec 1 colonne date et 1 colonne qjm, qjm étant le débit journalier exprimé en L/s
 }
 \description{
-Fonction pour importer des données de débit à partir des API SIMFEN
-https://geosas.fr/web/?page_id=3804
-La fonction exploite en priorité la base des archives DREAL et en complément celles hubeau
-
 Fonction pour importer des données de débit à partir des API SIMFEN
 https://geosas.fr/web/?page_id=3804
 La fonction exploite en priorité la base des archives DREAL et en complément celles hubeau
@@ -36,6 +30,7 @@ test_debit<-importe_debit(X=381425.6,
                           Y=6755598, 
                           date_debut=as.Date("2010-01-01"), 
                           date_fin = as.Date("2010-01-17"))
+
 #CALCUL DU FLUX DE NITRATE SUR LE SEMNON
 datafile <- system.file("donnees_nitrate_semnon.csv", package = "calculeflux")
 nitrates_semnon <- read.csv2(datafile, 

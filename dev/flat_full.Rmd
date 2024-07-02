@@ -978,11 +978,12 @@ test_that("importe_debit_dates_dispo works", {
 #'@param Y :  coordonnée du point à partir duquel on souhaite estimer les débits en Lambert 93
 #'@param date_debut : date de début de la requête (format date)
 #'@param date_fin : date de fin de la requête (format date)
+#'@param source : source des données : archives_dreal ou hub_eau
 #' 
 #' @return dataframe avec 1 colonne date et 1 colonne qjm, qjm étant le débit journalier exprimé en L/s
 #' 
 #' @export
-importe_debit <- function(X, Y, date_debut, date_fin) {
+importe_debit <- function(X, Y, date_debut, date_fin, source="dreal") {
   if (!("numeric" %in% class(X))) {
     stop("X doit \u00eatre de type numeric")
   }
@@ -998,7 +999,9 @@ importe_debit <- function(X, Y, date_debut, date_fin) {
   if (date_fin < date_debut) {
     stop("date_fin doit \u00eatre sup\u00e9rieure ou \u00e9gale \u00e0 date_debut")
   }
-  
+   if (!source %in% c("archives_dreal", "hub_eau")) {
+    stop("source doit valoir soit archives_dreal soit hub_eau")
+  }
   
   # teste si les dates demandées sont disponibles sous geosas
   dates_dispo <- importe_debit_dates_dispo()
@@ -1007,9 +1010,13 @@ importe_debit <- function(X, Y, date_debut, date_fin) {
    dates_dispo<-dates_dispo[dates_dispo$name%in%c(" hub_eau"," archives_dreal"),]
   
   #temporaire car hub_eau est HS sous SIMFEN
-  dates_dispo<-dates_dispo[dates_dispo$name!=(" hub_eau"),]
-  
-  
+#  dates_dispo<-dates_dispo[dates_dispo$name!=(" hub_eau"),]
+  if(source=="archives_dreal"){
+   dates_dispo<-dates_dispo[dates_dispo$name==(" archives_dreal"),]} 
+    if(source=="hub_eau"){
+   dates_dispo<-dates_dispo[dates_dispo$name==(" hub_eau"),]}
+   
+   
   if (date_debut < min(dates_dispo$start_date)) {
     stop(
       paste0(
@@ -1028,23 +1035,9 @@ importe_debit <- function(X, Y, date_debut, date_fin) {
   }
   
   # sélection de la base source de données selon les dates demandées
-  sources_data <- data.frame(source = "archives_dreal",
+  sources_data <- data.frame(source = source,
                              date_debut = date_debut,
                              date_fin = date_fin)
-  
-  # ordre de priorité : archives_dreal > hub_eau
-  if (date_fin > dates_dispo[dates_dispo$name == " archives_dreal", ]$end_date)
-  {
-    sources_data <- data.frame(
-      source = c("archives_dreal",
-                 "hub_eau"),
-      date_debut = c(date_debut,
-                     dates_dispo[dates_dispo$name == " archives_dreal", ]$end_date +
-                       1),
-      date_fin = c(dates_dispo[dates_dispo$name == " archives_dreal", ]$end_date,
-                   date_fin)
-    )
-  }
   
   nb_lignes <- 6000
   
