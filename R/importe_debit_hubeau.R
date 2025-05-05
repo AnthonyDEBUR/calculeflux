@@ -18,6 +18,7 @@
 #' @export
 #' @examples
 #' test<-importe_debit_hubeau(code_entite="J9300611",
+#'                            code_station="J930061101",
 #'                      date_debut_obs_elab=as.Date("2010-01-01"),
 #'                      date_fin_obs_elab=as.Date("2012-12-31"))
 importe_debit_hubeau <-   function(code_entite,
@@ -56,23 +57,24 @@ if (!is.character(code_entite) & !is.character(code_station)) {
     url_base <-
       "https://hubeau.eaufrance.fr/api/v2/hydrometrie/obs_elab?"
 
-    data <- httr::GET(
-      url_base,
-      query = list(
-        date_debut_obs_elab = date_debut_obs_elab,
-        date_fin_obs_elab = date_fin_obs_elab,
-        size = 5000,
-        grandeur_hydro_elab="QmnJ"
-       )
-    )
 
-if (!is.null(code_entite)) {
+# Construction de la requête conditionnelle
+query_list <- list(
+date_debut_obs_elab = date_debut_obs_elab,
+date_fin_obs_elab = date_fin_obs_elab,
+size = 5000,
+grandeur_hydro_elab = "QmnJ"
+ )
+ 
+ if (!is.null(code_entite)) {
 query_list$code_entite <- paste0(code_entite, collapse = ",")
  }
  
  if (!is.null(code_station)) {
 query_list$code_station <- paste0(code_station, collapse = ",")
  }
+
+ data <- httr::GET(url_base, query = query_list)
 
 
     httr::warn_for_status(data)
