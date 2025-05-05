@@ -1867,7 +1867,7 @@ tryCatch(emprise0<-sf::st_transform(emprise, crs=4326),
   bbox<-sf::st_bbox(emprise0)
   
     url_base <-
-      "https://hubeau.eaufrance.fr/api/v1/hydrometrie/referentiel/stations?"
+      "https://hubeau.eaufrance.fr/api/v2/hydrometrie/referentiel/stations?"
 
     data <- httr::GET(url_base,
                       query = list(bbox = paste0(bbox, collapse = ","),
