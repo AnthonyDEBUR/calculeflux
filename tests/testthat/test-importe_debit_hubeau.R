@@ -3,6 +3,7 @@
 test_that("importe_debit_hubeau works", {
   
   test<-importe_debit_hubeau(code_entite="J9300611",
+                             code_station="J930061101",
                      date_debut_obs_elab=as.Date("2010-01-01"),
                      date_fin_obs_elab=as.Date("2011-12-31"))
   

@@ -7,6 +7,8 @@
 #' 
 #' @param code_entite character or vector with the code of the hydrometric station 
 #' or stations for which we want to retrieve the data (mandatory)
+#' @param code_station character or vector with the code of the hydrometric station 
+#' or stations for which we want to retrieve the data (mandatory)
 #' @param date_debut_obs_elab start date of observations to retrieve (optional)
 #' @param date_fin_obs_elab end date of observations to retrieve (optional)
 #'
@@ -19,15 +21,19 @@
 #'                      date_debut_obs_elab=as.Date("2010-01-01"),
 #'                      date_fin_obs_elab=as.Date("2012-12-31"))
 importe_debit_hubeau <-   function(code_entite,
+                                   code_station,
            date_debut_obs_elab = NULL,
            date_fin_obs_elab = NULL) {
     #astuces pour éviter note no visible binding for global variable
   .<- NULL
   
   
-    if (!is.character(code_entite)) {
-      stop("importe_debit_hubeau : code_entite must be of class character")
-    }
+
+
+if (!is.character(code_entite) & !is.character(code_station)) {
+ stop("importe_debit_hubeau : Au moins une des variables code_entite ou code_station doit être de type character")
+ }
+
     if (!is.null(date_debut_obs_elab)) {
       if (!lubridate::is.Date(date_debut_obs_elab)) {
         stop("importe_debit_hubeau : date_debut_obs_elab must be of class Date")
@@ -53,14 +59,20 @@ importe_debit_hubeau <-   function(code_entite,
     data <- httr::GET(
       url_base,
       query = list(
-        code_entite = paste0(code_entite, collapse = ","),
         date_debut_obs_elab = date_debut_obs_elab,
         date_fin_obs_elab = date_fin_obs_elab,
         size = 5000,
         grandeur_hydro_elab="QmnJ"
-        # , fields = "code_station,date_obs_elab,resultat_obs_elab"
-      )
+       )
     )
+
+if (!is.null(code_entite)) {
+query_list$code_entite <- paste0(code_entite, collapse = ",")
+ }
+ 
+ if (!is.null(code_station)) {
+query_list$code_station <- paste0(code_station, collapse = ",")
+ }
 
 
     httr::warn_for_status(data)
@@ -114,5 +126,12 @@ importe_debit_hubeau <-   function(code_entite,
     if (data$status_code == 400){stop("importe_debit_hubeau : incorrect query")}
     if (data$status_code == 500){stop("importe_stations_hydrometriques_hubeau : hubeau server internal error")}
 
+    
+# Vérification des doublons de date_obs_elab
+ if (any(duplicated(data0$date_obs_elab))) {
+ warning("importe_debit_hubeau : Le tableau de résultat contient plusieurs lignes pour une même date_obs_elab")
+ }
+
+    
     return(data0)
 }

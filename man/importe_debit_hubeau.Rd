@@ -6,12 +6,16 @@
 \usage{
 importe_debit_hubeau(
   code_entite,
+  code_station,
   date_debut_obs_elab = NULL,
   date_fin_obs_elab = NULL
 )
 }
 \arguments{
 \item{code_entite}{character or vector with the code of the hydrometric station
+or stations for which we want to retrieve the data (mandatory)}
+
+\item{code_station}{character or vector with the code of the hydrometric station
 or stations for which we want to retrieve the data (mandatory)}
 
 \item{date_debut_obs_elab}{start date of observations to retrieve (optional)}
