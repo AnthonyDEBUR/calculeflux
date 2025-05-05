@@ -48,7 +48,7 @@ importe_debit_hubeau <-   function(code_entite,
 
 
     url_base <-
-      "https://hubeau.eaufrance.fr/api/v1/hydrometrie/obs_elab?"
+      "https://hubeau.eaufrance.fr/api/v2/hydrometrie/obs_elab?"
 
     data <- httr::GET(
       url_base,

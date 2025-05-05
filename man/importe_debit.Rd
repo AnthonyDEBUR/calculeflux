@@ -4,7 +4,7 @@
 \alias{importe_debit}
 \title{importe_debit}
 \usage{
-importe_debit(X, Y, date_debut, date_fin, source = "dreal")
+importe_debit(X, Y, date_debut, date_fin, source = "archives_dreal")
 }
 \arguments{
 \item{X}{: coordonnée du point à partir duquel on souhaite estimer les débits en Lambert 93}

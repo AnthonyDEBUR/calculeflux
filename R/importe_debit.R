@@ -128,7 +128,7 @@
 #'           estim\u00e9s \u00e0 l\'aide de l\'API SIMFEN / GEOSAS")
 #'
 #'
-importe_debit <- function(X, Y, date_debut, date_fin, source="dreal") {
+importe_debit <- function(X, Y, date_debut, date_fin, source="archives_dreal") {
   if (!("numeric" %in% class(X))) {
     stop("X doit \u00eatre de type numeric")
   }
@@ -152,12 +152,12 @@ importe_debit <- function(X, Y, date_debut, date_fin, source="dreal") {
   dates_dispo <- importe_debit_dates_dispo()
   
   #on se limite aux modèles hub_eau et archive_dreal
-   dates_dispo<-dates_dispo[dates_dispo$name%in%c(" hub_eau"," archives_dreal"),]
+   dates_dispo<-dates_dispo[dates_dispo$name%in%c(" hub_eau","archives_dreal"),]
   
   #temporaire car hub_eau est HS sous SIMFEN
 #  dates_dispo<-dates_dispo[dates_dispo$name!=(" hub_eau"),]
   if(source=="archives_dreal"){
-   dates_dispo<-dates_dispo[dates_dispo$name==(" archives_dreal"),]} 
+   dates_dispo<-dates_dispo[dates_dispo$name==("archives_dreal"),]} 
     if(source=="hub_eau"){
    dates_dispo<-dates_dispo[dates_dispo$name==(" hub_eau"),]}
    

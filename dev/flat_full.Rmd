@@ -983,7 +983,7 @@ test_that("importe_debit_dates_dispo works", {
 #' @return dataframe avec 1 colonne date et 1 colonne qjm, qjm étant le débit journalier exprimé en L/s
 #' 
 #' @export
-importe_debit <- function(X, Y, date_debut, date_fin, source="dreal") {
+importe_debit <- function(X, Y, date_debut, date_fin, source="archives_dreal") {
   if (!("numeric" %in% class(X))) {
     stop("X doit \u00eatre de type numeric")
   }
@@ -1007,12 +1007,12 @@ importe_debit <- function(X, Y, date_debut, date_fin, source="dreal") {
   dates_dispo <- importe_debit_dates_dispo()
   
   #on se limite aux modèles hub_eau et archive_dreal
-   dates_dispo<-dates_dispo[dates_dispo$name%in%c(" hub_eau"," archives_dreal"),]
+   dates_dispo<-dates_dispo[dates_dispo$name%in%c(" hub_eau","archives_dreal"),]
   
   #temporaire car hub_eau est HS sous SIMFEN
 #  dates_dispo<-dates_dispo[dates_dispo$name!=(" hub_eau"),]
   if(source=="archives_dreal"){
-   dates_dispo<-dates_dispo[dates_dispo$name==(" archives_dreal"),]} 
+   dates_dispo<-dates_dispo[dates_dispo$name==("archives_dreal"),]} 
     if(source=="hub_eau"){
    dates_dispo<-dates_dispo[dates_dispo$name==(" hub_eau"),]}
    
@@ -1744,7 +1744,7 @@ importe_debit_hubeau <-   function(code_entite,
 
 
     url_base <-
-      "https://hubeau.eaufrance.fr/api/v1/hydrometrie/obs_elab?"
+      "https://hubeau.eaufrance.fr/api/v2/hydrometrie/obs_elab?"
 
     data <- httr::GET(
       url_base,
