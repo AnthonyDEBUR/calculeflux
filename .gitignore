@@ -8,4 +8,7 @@ dev/macroflux/*
 /credentials.yml
 .settings
 .project
+dev/*.html
+dev/*.R
+*.yaml
 
