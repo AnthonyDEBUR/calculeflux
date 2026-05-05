@@ -1307,7 +1307,7 @@ test_that("importe_BV_amont works", {
 ```{r function-calcule_flux_annuels}
 #' calcule_flux_annuels
 #' 
-#' This function calculate ech annual fluxes of a period.
+#' This function calculate each annual fluxes of a period.
 #' For a same date if their are more than one analysis or flow rate values, then 
 #' calculus is done by considering the mean (excluding NA) of all the values for the day.
 #' 

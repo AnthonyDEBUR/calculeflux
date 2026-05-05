@@ -1,0 +1,51 @@
+---
+title: "flat_calcule_flux_wrtds.Rmd empty"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r development, include=FALSE}
+library(testthat)
+```
+
+```{r development-load}
+# Load already included functions if relevant
+pkgload::load_all(export_all = FALSE)
+```
+
+# calcule_flux_wrtds
+
+```{r development-calcule_flux_wrtds}
+# Prepare the code of your function here
+```
+
+```{r function-calcule_flux_wrtds}
+#' calcule_flux_wrtds Title
+#'
+#' @return 1
+#' @export
+#'
+#' @examples
+calcule_flux_wrtds <- function() {
+  1
+}
+```
+
+```{r examples-calcule_flux_wrtds}
+calcule_flux_wrtds()
+```
+
+```{r tests-calcule_flux_wrtds}
+test_that("calcule_flux_wrtds works", {
+  expect_true(inherits(calcule_flux_wrtds, "function"))
+})
+```
+
+
+```{r development-inflate, eval=FALSE}
+# Run but keep eval=FALSE to avoid infinite loop
+# Execute in the console directly
+fusen::inflate(flat_file = "dev/flat_calcule_flux_wrtds.Rmd", vignette_name = "Go further")
+```
+
