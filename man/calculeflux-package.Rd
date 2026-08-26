@@ -13,6 +13,7 @@ Calculation of fluxes with differents methods described in https://revue-set.fr/
 
 Authors:
 \itemize{
+  \item Anthony DE BURGHRAVE \email{anthony.deburghrave@eaux-et-vilaine.bzh}
   \item Cédric BRIAND
 }
 

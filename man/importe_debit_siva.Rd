@@ -21,23 +21,26 @@ This function will load data from the Arzal dam
 }
 \examples{
 # Ask anthony or Cédric for the credential file
- tryCatch({
+tryCatch({
   cred <- yaml::read_yaml("credentials.yml")
-  }, error= function(e){"You need to have the credentials to connect to SIVA"})
-  
-  hostmysql. <- cred$hostmysql
-  pwdmysql. <- cred$pwdmysql
-  umysql. <- cred$usermysql
- 
- pool <- pool::dbPool(
-     drv = RMariaDB::MariaDB(),
-     dbname = "archive_IAV",
-     host = hostmysql.,
-     username = umysql.,
-     password = pwdmysql.,
-     port=3306
- )
+}, error = function(e) {
+  stop("You need to have the credentials to connect to SIVA")
+})
+
+hostmysql. <- cred$hostmysql
+pwdmysql.  <- cred$pwdmysql
+umysql.    <- cred$usermysql
+
+pool <- pool::dbPool(
+  drv = RMySQL::MySQL(),
+  dbname = "archive_IAV",
+  host = hostmysql.,
+  username = umysql.,
+  password = pwdmysql.,
+  port = 3306
+)
+
 importe_debit_siva(debut="2020-01-01 00:00:00",
-     fin="2020-01-20 00:00:00",
+     fin="2020-01-10 00:00:00",
      con=pool)
 }

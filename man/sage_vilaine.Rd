@@ -15,7 +15,7 @@ A sf object with 1 row and 2 variables
 https://sandre.eaufrance.fr/atlas/srv/fre/catalog.search#/metadata/2faf7c9e-ad62-4137-b80b-8b0caa3609cb
 }
 \usage{
-sage_vilaine
+data(sage_vilaine)
 }
 \description{
 data in 'datasets'.

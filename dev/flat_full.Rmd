@@ -1958,7 +1958,7 @@ tryCatch(emprise0<-sf::st_transform(emprise, crs=4326),
 ```
   
 ```{r example-importe_stations_hydrometriques_hubeau}
-utils::data(sage_vilaine, package="calculeflux")
+utils::data("sage_vilaine", package="calculeflux")
   test<-importe_stations_hydrometriques_hubeau(emprise=sage_vilaine)
 
   plot(sage_vilaine)
@@ -1967,7 +1967,7 @@ utils::data(sage_vilaine, package="calculeflux")
   
 ```{r tests-importe_stations_hydrometriques_hubeau}
 test_that("importe_stations_hydrometriques_hubeau works", {
-  utils::data(sage_vilaine, package="calculeflux")
+  utils::data("sage_vilaine", package="calculeflux")
   test<-importe_stations_hydrometriques_hubeau(emprise=sage_vilaine)
   expect_true(nrow(test)>100) 
 })
@@ -2341,24 +2341,27 @@ importe_debit_siva <- function(debut,
   
 ```{r example-importe_debit_siva}
 # Ask anthony or Cédric for the credential file
- tryCatch({
+tryCatch({
   cred <- yaml::read_yaml("credentials.yml")
-  }, error= function(e){"You need to have the credentials to connect to SIVA"})
-  
-  hostmysql. <- cred$hostmysql
-  pwdmysql. <- cred$pwdmysql
-  umysql. <- cred$usermysql
- 
- pool <- pool::dbPool(
-     drv = RMariaDB::MariaDB(),
-     dbname = "archive_IAV",
-     host = hostmysql.,
-     username = umysql.,
-     password = pwdmysql.,
-     port=3306
- )
+}, error = function(e) {
+  stop("You need to have the credentials to connect to SIVA")
+})
+
+hostmysql. <- cred$hostmysql
+pwdmysql.  <- cred$pwdmysql
+umysql.    <- cred$usermysql
+
+pool <- pool::dbPool(
+  drv = RMySQL::MySQL(),
+  dbname = "archive_IAV",
+  host = hostmysql.,
+  username = umysql.,
+  password = pwdmysql.,
+  port = 3306
+)
+
 importe_debit_siva(debut="2020-01-01 00:00:00",
-     fin="2020-01-20 00:00:00",
+     fin="2020-01-10 00:00:00",
      con=pool)
 ```
   
@@ -2376,14 +2379,14 @@ test_that("importe_debit_siva works",
             pwdmysql. <- cred$pwdmysql
             umysql. <- cred$usermysql
             
-            pool <- pool::dbPool(
-              drv = RMariaDB::MariaDB(),
-              dbname = "archive_IAV",
-              host = hostmysql.,
-              username = umysql.,
-              password = pwdmysql.,
-              port = 3306
-            )
+  pool <- pool::dbPool(
+  drv = RMySQL::MySQL(),
+  dbname = "archive_IAV",
+  host = hostmysql.,
+  username = umysql.,
+  password = pwdmysql.,
+  port = 3306
+)
             system.time(
             debit_barrage <- importe_debit_siva(
                 debut = as.POSIXct(strptime("2009-12-31 00:00:00", format = "%Y-%m-%d %H:%M:%S")),

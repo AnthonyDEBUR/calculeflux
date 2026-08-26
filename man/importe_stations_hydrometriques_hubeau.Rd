@@ -21,7 +21,7 @@ This function allows for importing available hydrometric stations from the
 Hydrometry HUB'EAU API (https://hubeau.eaufrance.fr/page/api-hydrometrie).
 }
 \examples{
-utils::data(sage_vilaine, package="calculeflux")
+utils::data("sage_vilaine", package="calculeflux")
   test<-importe_stations_hydrometriques_hubeau(emprise=sage_vilaine)
 
   plot(sage_vilaine)

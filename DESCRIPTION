@@ -27,16 +27,16 @@ Suggests:
     ggplot2,
     knitr,
     pool,
-    RMariaDB,
     rmarkdown,
+    RMySQL,
     testthat,
     yaml,
     zoo
 Citation: De Burghrave A., Briand C. (2023). calculeflux: package pour
     calculer des flux de nitrates.
     https://github.com/AnthonyDEBUR/calculeflux
-Config/fusen/version: 0.6.0
+Config/fusen/version: 0.7.2
+Config/roxygen2/version: 8.1.0
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.2
 year: 2023
